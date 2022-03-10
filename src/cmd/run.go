@@ -28,8 +28,8 @@ func doRun(cmd *cobra.Command, args []string) {
 	pod, err := runner.CreatePod(getPodObject())
 	cobra.CheckErr(err)
 
-	// TODO: check if pod is ready in polling loop with timeout
-	time.Sleep(35 * time.Second)
+	// TODO: check if pod status == Running in polling loop with timeout
+	time.Sleep(10 * time.Second)
 
 	stdout, stderr, err := runner.RunWithFullOutput(pod, "busybox", "/bin/sh", "-c", "ls -al")
 	cobra.CheckErr(err)
