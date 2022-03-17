@@ -13,8 +13,9 @@ import (
 
 // previewCmd represents the preview command
 var runCmd = &cobra.Command{
-	Use: "run",
-	Run: doRun,
+	Use:  "run [COMMAND]",
+	Args: cobra.MaximumNArgs(1),
+	Run:  doRun,
 }
 
 func init() {
@@ -31,7 +32,7 @@ func doRun(cmd *cobra.Command, args []string) {
 	// TODO: check if pod status == Running in polling loop with timeout
 	time.Sleep(10 * time.Second)
 
-	stdout, stderr, err := runner.RunWithFullOutput(pod, "busybox", "/bin/sh", "-c", "ls -al")
+	stdout, stderr, err := runner.RunWithFullOutput(pod, "busybox", "/bin/sh", "-c", args[0])
 	cobra.CheckErr(err)
 	log.Info().Msg(stdout)
 	log.Error().Msg(stderr)
