@@ -1,14 +1,14 @@
 package cmd
 
 import (
-	"bytes"
 	"context"
+	"fmt"
 	"io"
-	"net/url"
-	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -24,10 +24,8 @@ type JobConfig struct {
 	PodName       string
 	ContainerName string
 	Stdin         io.Reader
-	CaptureStdout bool
-	CaptureStderr bool
-	// If false, whitespace in std{err,out} will be removed.
-	PreserveWhitespace bool
+	Stdout        io.Writer
+	Stderr        io.Writer
 }
 
 type JobRunner struct {
@@ -73,7 +71,7 @@ func getKubernetesConfig() (*rest.Config, error) {
 	return config, nil
 }
 
-func (r *JobRunner) RunWithConfig(config JobConfig) (string, string, error) {
+func (r *JobRunner) RunWithConfig(config JobConfig) error {
 
 	req := r.clientset.CoreV1().RESTClient().Post().
 		Resource("pods").
@@ -85,47 +83,61 @@ func (r *JobRunner) RunWithConfig(config JobConfig) (string, string, error) {
 		Container: config.ContainerName,
 		Command:   config.Command,
 		Stdin:     config.Stdin != nil,
-		Stdout:    config.CaptureStdout,
-		Stderr:    config.CaptureStderr,
+		Stdout:    config.Stdout != nil,
+		Stderr:    config.Stderr != nil,
 		TTY:       false,
 	}, scheme.ParameterCodec)
-
-	var stdout, stderr bytes.Buffer
 	log.Info().Msgf("ExecWithOptions: execute(POST %s)", req.URL())
-	err := execute("POST", req.URL(), r.config, config.Stdin, &stdout, &stderr)
-	if config.PreserveWhitespace {
-		return stdout.String(), stderr.String(), err
-	}
-	return strings.TrimSpace(stdout.String()), strings.TrimSpace(stderr.String()), err
-}
-
-func (r *JobRunner) RunWithFullOutput(pod *corev1.Pod, containerName string, cmd ...string) (string, string, error) {
-	return r.RunWithConfig(JobConfig{
-		Command:            cmd,
-		Namespace:          pod.Namespace,
-		PodName:            pod.Name,
-		ContainerName:      containerName,
-		Stdin:              nil,
-		CaptureStdout:      true,
-		CaptureStderr:      true,
-		PreserveWhitespace: false,
-	})
-}
-
-func execute(method string, url *url.URL, config *rest.Config, stdin io.Reader, stdout, stderr io.Writer) error {
-	exec, err := remotecommand.NewSPDYExecutor(config, method, url)
+	exec, err := remotecommand.NewSPDYExecutor(r.config, "POST", req.URL())
 	if err != nil {
 		return err
 	}
 	return exec.Stream(remotecommand.StreamOptions{
-		Stdin:  stdin,
-		Stdout: stdout,
-		Stderr: stderr,
+		Stdin:  config.Stdin,
+		Stdout: config.Stdout,
+		Stderr: config.Stderr,
 		Tty:    false,
+	})
+}
+
+func (r *JobRunner) Run(stdout, stderr io.Writer, pod *corev1.Pod, containerName string, cmd ...string) error {
+	return r.RunWithConfig(JobConfig{
+		Command:       cmd,
+		Namespace:     pod.Namespace,
+		PodName:       pod.Name,
+		ContainerName: containerName,
+		Stdin:         nil,
+		Stdout:        stdout,
+		Stderr:        stderr,
 	})
 }
 
 func (r *JobRunner) CreatePod(podConfig *corev1.Pod) (*corev1.Pod, error) {
 	log.Info().Msgf("Creating pod %s/%s ...", podConfig.Namespace, podConfig.Name)
 	return r.clientset.CoreV1().Pods(podConfig.Namespace).Create(context.TODO(), podConfig, metav1.CreateOptions{})
+}
+
+func (r *JobRunner) WaitForPod(podConfig *corev1.Pod, timeout time.Duration) error {
+	log.Info().Msgf("Waiting for pod %s/%s to be ready in %s ...", podConfig.Namespace, podConfig.Name, timeout)
+	return wait.PollImmediate(time.Second, timeout, func() (bool, error) {
+		// TODO: progress bar?
+
+		pod, err := r.clientset.CoreV1().Pods(podConfig.Namespace).Get(context.TODO(), podConfig.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		switch pod.Status.Phase {
+		case corev1.PodRunning:
+			return true, nil
+		case corev1.PodFailed, corev1.PodSucceeded:
+			return false, fmt.Errorf("pod ran to completion")
+		}
+		return false, nil
+	})
+}
+
+func (r *JobRunner) DeletePod(podConfig *corev1.Pod) error {
+	log.Info().Msgf("Deleting pod %s/%s ...", podConfig.Namespace, podConfig.Name)
+	return r.clientset.CoreV1().Pods(podConfig.Namespace).Delete(context.TODO(), podConfig.Name, metav1.DeleteOptions{})
 }
