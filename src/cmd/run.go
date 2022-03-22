@@ -15,7 +15,7 @@ import (
 type JobEnvSchema struct {
 	Key       string `json:"key"`
 	Value     string `json:"value"`
-	Sensative bool   `json:"sensative"`
+	Sensitive bool   `json:"sensitive"`
 }
 
 type JobSchema struct {
@@ -48,28 +48,28 @@ func doRun(cmd *cobra.Command, args []string) {
 		//Image: "registry.gitlab.com/jklabsinc/opslevel-containers/opslevel:main",
 		Image: "alpine/curl",
 		Commands: []string{
-			"export KYLE_TEST=100", // Could handle per job config like this so its not baked into the container on startup and the container could be reused
-			"pwd",
-			"echo $(curl https://www.githubstatus.com/api/v2/status.json) > data.json",
-			"ls -al",
-			"cat data.json",
-			"for i in 1 2 3 4 5 6 7 8 9 10; do echo \"Hearthbeat $i\"; sleep 1; done",
-			"env",
-			"rm data.json",
-			"ls -la",
-			"env",
-			"for i in 1 2 3 4 5 6 7 8 9 10; do echo \"Hearthbeat $i\"; sleep 1; done",
-			"mkdir ./kyle",
-			"cd ./kyle",
-			"echo \"Hello World\" > data.json",
-			"pwd",
-			"sleep 2",
-			"cat data.json",
-			"echo $KYLE_TEST",
+			// "export KYLE_TEST=100", // Could handle per job config like this so its not baked into the container on startup and the container could be reused
+			// "pwd",
+			// "echo $(curl https://www.githubstatus.com/api/v2/status.json) > data.json",
+			// "ls -al",
+			// "cat data.json",
+			"for i in 1 2 3 4 5 6 7 8 9 10 11 12 13; do echo \"Hearthbeat $i\"; sleep 1; done",
+			// "env",
+			// "rm data.json",
+			// "ls -la",
+			// "env",
+			// "for i in 1 2 3 4 5 6 7 8 9 10; do echo \"Hearthbeat $i\"; sleep 1; done",
+			// "mkdir ./kyle",
+			// "cd ./kyle",
+			// "echo \"Hello World\" > data.json",
+			// "pwd",
+			// "sleep 2",
+			// "cat data.json",
+			// "echo $KYLE_TEST",
 		},
 		Config: []JobEnvSchema{
-			{Key: "AWS_ACCESS_KEY", Value: "123456789", Sensative: false},
-			{Key: "AWS_SECRET_KEY", Value: "987654321", Sensative: false},
+			{Key: "AWS_ACCESS_KEY", Value: "123456789", Sensitive: false},
+			{Key: "AWS_SECRET_KEY", Value: "987654321", Sensitive: false},
 		},
 	}
 
@@ -93,18 +93,13 @@ func doRun(cmd *cobra.Command, args []string) {
 	// TODO: Create Job Log Streamer
 	// TODO: Batch Send N lines?
 	var stdout, stderr SafeBuffer
-	go func() {
-		for {
-			for len(stdout.String()) > 0 {
-				line, err := stdout.ReadString('\n')
-				if err == nil {
-					// TODO: Stream back to OpsLevel for JobId
-					log.Info().Msgf("[%s] %s", job.JobId, strings.TrimSuffix(line, "\n"))
-				}
-			}
-			time.Sleep(time.Millisecond * 100)
-		}
-	}()
+	writer := NewOpsLevelLogWriter(job.JobId, time.Second*5, 1000000)
+	streamer := LogStreamer{
+		logger: log.Output(&writer).With().Logger(),
+		stdout: &stdout,
+		stderr: &stderr,
+	}
+	go streamer.Run(job.JobId)
 
 	working_directory := fmt.Sprintf("/jobs/%s/", job.JobId)
 	// Use Per Job directory?
@@ -121,6 +116,7 @@ func doRun(cmd *cobra.Command, args []string) {
 	for len(stdout.String()) > 0 {
 		time.Sleep(time.Millisecond * 200)
 	}
+	writer.Emit()
 }
 
 func getPodEnv(configs []JobEnvSchema) []corev1.EnvVar {
