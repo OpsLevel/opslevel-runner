@@ -1,5 +1,7 @@
 package pkg
 
+import "encoding/json"
+
 type JobEnvSchema struct {
 	Key       string `json:"key"`
 	Value     string `json:"value"`
@@ -11,4 +13,9 @@ type JobSchema struct {
 	Image    string         `json:"image"`
 	Commands []string       `json:"commands"`
 	Config   []JobEnvSchema `json:"config"`
+}
+
+func (s *JobSchema) ToJson() (string, error) {
+	data, err := json.MarshalIndent(s, "", "  ")
+	return string(data), err
 }

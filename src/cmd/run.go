@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/opslevel/opslevel-runner/pkg"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
@@ -52,6 +53,13 @@ func doRun(cmd *cobra.Command, args []string) {
 			{Key: "AWS_SECRET_KEY", Value: "987654321", Sensitive: false},
 		},
 	}
-
+	data, err := job.ToJson()
+	cobra.CheckErr(err)
+	cipher := pkg.NewCipher("123456789", "12")
+	encoded, err := cipher.Encrypt(data)
+	cobra.CheckErr(err)
+	decoded, err := cipher.Decrypt(encoded)
+	cobra.CheckErr(err)
+	log.Info().Msgf(string(decoded))
 	cobra.CheckErr(runner.Run(&job))
 }

@@ -173,7 +173,7 @@ func (r *JobRunner) ExecWithConfig(config JobConfig) error {
 		Stderr:    config.Stderr != nil,
 		TTY:       false,
 	}, scheme.ParameterCodec)
-	log.Info().Msgf("ExecWithOptions: execute(POST %s)", req.URL())
+	log.Trace().Msgf("ExecWithOptions: execute(POST %s)", req.URL())
 	exec, err := remotecommand.NewSPDYExecutor(r.config, "POST", req.URL())
 	if err != nil {
 		return err
