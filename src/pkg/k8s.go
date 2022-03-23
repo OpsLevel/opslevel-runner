@@ -18,6 +18,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func getPodEnv(configs []JobEnvSchema) []corev1.EnvVar {
@@ -83,7 +84,7 @@ func (s *JobRunner) Run(job *JobSchema) error {
 	defer s.DeletePod(pod)
 
 	// TODO: configurable timeout
-	timeout := time.Second * 10
+	timeout := time.Second * time.Duration(viper.GetInt("pod-max-wait"))
 	waitErr := s.WaitForPod(pod, timeout)
 	if waitErr != nil {
 		// TODO: Stream error back to OpsLevel for JobId
@@ -93,7 +94,7 @@ func (s *JobRunner) Run(job *JobSchema) error {
 	}
 	var stdout, stderr SafeBuffer
 	// TODO: this log streamer should probably be used for All "job" logging to capture errors
-	writer := NewOpsLevelLogWriter(job.JobId, time.Second*5, 1000000)
+	writer := NewOpsLevelLogWriter(job.JobId, time.Second*time.Duration(viper.GetInt("pod-log-max-interval")), viper.GetInt("pod-log-max-size"))
 	streamer := NewLogStreamer(log.Logger, &stdout, &stderr)
 	// TODO: Cleanup this streamer when run is a long lived process?
 	go streamer.Run(job.JobId)
@@ -101,8 +102,7 @@ func (s *JobRunner) Run(job *JobSchema) error {
 	working_directory := fmt.Sprintf("/jobs/%s/", job.JobId)
 	// Use Per Job directory?
 	commands := append([]string{fmt.Sprintf("mkdir -p %s", working_directory), fmt.Sprintf("cd %s", working_directory)}, job.Commands...)
-	// TODO: how to determine shell - sh or bash? configurable?
-	runErr := s.Exec(&stdout, &stderr, pod, pod.Spec.Containers[0].Name, "/bin/sh", "-e", "-c", strings.Join(commands, ";\n"))
+	runErr := s.Exec(&stdout, &stderr, pod, pod.Spec.Containers[0].Name, viper.GetString("pod-shell"), "-e", "-c", strings.Join(commands, ";\n"))
 	if runErr != nil {
 		// TODO: Stream Error back to OpsLevel for JobId
 		log.Error().Err(runErr).Msgf("[%s] %s", job.JobId, strings.TrimSuffix(stderr.String(), "\n"))
