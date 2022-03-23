@@ -1,4 +1,4 @@
-package cmd
+package pkg
 
 import (
 	"fmt"
@@ -12,6 +12,10 @@ type LogStreamer struct {
 	logger zerolog.Logger
 	stdout *SafeBuffer
 	stderr *SafeBuffer
+}
+
+func NewLogStreamer(logger zerolog.Logger, stdout, stderr *SafeBuffer) LogStreamer {
+	return LogStreamer{logger: logger, stdout: stdout, stderr: stderr}
 }
 
 func (s LogStreamer) Run(job_id string) {
@@ -66,10 +70,10 @@ func (s *OpsLevelLogWriter) Write(p []byte) (n int, err error) {
 
 func (s *OpsLevelLogWriter) Emit() {
 	// TODO: Send API request back to OpsLevel with all s.cache log lines
-	fmt.Printf("Emitting '%d' bytes to OpsLevel\n", len(s.cache))
-	fmt.Printf("##########\n")
-	fmt.Printf("%s", string(s.cache))
-	fmt.Printf("##########\n")
+	// fmt.Printf("Emitting '%d' bytes to OpsLevel\n", len(s.cache))
+	// fmt.Printf("##########\n")
+	// fmt.Printf("%s", string(s.cache))
+	// fmt.Printf("##########\n")
 	s.cache = []byte{}
 	s.timeSinceLastEmit = time.Now()
 }
