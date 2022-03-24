@@ -16,12 +16,13 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/remotecommand"
 
+	"github.com/opslevel/opslevel-go"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-func getPodEnv(configs []JobEnvSchema) []corev1.EnvVar {
+func getPodEnv(configs []opslevel.JobVariable) []corev1.EnvVar {
 	output := []corev1.EnvVar{}
 	for _, config := range configs {
 		output = append(output, corev1.EnvVar{
@@ -32,16 +33,17 @@ func getPodEnv(configs []JobEnvSchema) []corev1.EnvVar {
 	return output
 }
 
-func getPodObject(job *JobSchema) *corev1.Pod {
+func getPodObject(job opslevel.Job) *corev1.Pod {
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("opslevel-job-%s-%d", job.JobId, time.Now().Unix()),
+			Name:      fmt.Sprintf("opslevel-job-%s-%d", job.Id, time.Now().Unix()),
 			Namespace: "default",
 			Labels: map[string]string{
 				"app": "demo",
 			},
 		},
 		Spec: corev1.PodSpec{
+			TerminationGracePeriodSeconds: &[]int64{5}[0],
 			Containers: []corev1.Container{
 				{
 					Name:            "job",
@@ -52,7 +54,7 @@ func getPodObject(job *JobSchema) *corev1.Pod {
 						"-c",
 						"while :; do sleep 30; done",
 					},
-					Env: getPodEnv(job.Config),
+					Env: getPodEnv(job.Variables),
 				},
 			},
 		},
@@ -74,7 +76,8 @@ type JobRunner struct {
 	clientset *kubernetes.Clientset
 }
 
-func (s *JobRunner) Run(job *JobSchema) error {
+func (s *JobRunner) Run(job opslevel.Job) error {
+	id := job.Id.(string)
 	// TODO: manage pods based on image for re-use?
 	pod, err := s.CreatePod(getPodObject(job))
 	cobra.CheckErr(err)
@@ -89,23 +92,23 @@ func (s *JobRunner) Run(job *JobSchema) error {
 	if waitErr != nil {
 		// TODO: Stream error back to OpsLevel for JobId
 		// TODO: get pod status or status message?
-		log.Error().Err(waitErr).Msgf("[%s] pod was not ready in %v", job.JobId, timeout)
+		log.Error().Err(waitErr).Msgf("[%s] pod was not ready in %v", id, timeout)
 		return nil
 	}
 	var stdout, stderr SafeBuffer
 	// TODO: this log streamer should probably be used for All "job" logging to capture errors
-	writer := NewOpsLevelLogWriter(job.JobId, time.Second*time.Duration(viper.GetInt("pod-log-max-interval")), viper.GetInt("pod-log-max-size"))
+	writer := NewOpsLevelLogWriter(id, time.Second*time.Duration(viper.GetInt("pod-log-max-interval")), viper.GetInt("pod-log-max-size"))
 	streamer := NewLogStreamer(log.Logger, &stdout, &stderr)
 	// TODO: Cleanup this streamer when run is a long lived process?
-	go streamer.Run(job.JobId)
+	go streamer.Run(id)
 
-	working_directory := fmt.Sprintf("/jobs/%s/", job.JobId)
+	working_directory := fmt.Sprintf("/jobs/%s/", id)
 	// Use Per Job directory?
 	commands := append([]string{fmt.Sprintf("mkdir -p %s", working_directory), fmt.Sprintf("cd %s", working_directory)}, job.Commands...)
 	runErr := s.Exec(&stdout, &stderr, pod, pod.Spec.Containers[0].Name, viper.GetString("pod-shell"), "-e", "-c", strings.Join(commands, ";\n"))
 	if runErr != nil {
 		// TODO: Stream Error back to OpsLevel for JobId
-		log.Error().Err(runErr).Msgf("[%s] %s", job.JobId, strings.TrimSuffix(stderr.String(), "\n"))
+		log.Error().Err(runErr).Msgf("[%s] %s", id, strings.TrimSuffix(stderr.String(), "\n"))
 		return nil
 	}
 

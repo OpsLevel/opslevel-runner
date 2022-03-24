@@ -4,6 +4,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/opslevel/opslevel-go"
+	"github.com/opslevel/opslevel-runner/pkg"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -29,6 +31,8 @@ func Execute(v string, c string) {
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "./opslevel.yaml", "configuration options for the runner")
 	rootCmd.PersistentFlags().String("app-url", "https://app.opslevel.com", "The OpsLevel App Url. Overrides environment variable 'OPSLEVEL_APP_URL'")
+	rootCmd.PersistentFlags().String("api-url", "https://api.opslevel.com/graphql", "The OpsLevel API Url. Overrides environment variable 'OPSLEVEL_API_URL'")
+	rootCmd.PersistentFlags().String("api-token", "", "The OpsLevel API Token. Overrides environment variable 'OPSLEVEL_API_TOKEN'")
 	rootCmd.PersistentFlags().String("log-format", "TEXT", "overrides environment variable 'OPSLEVEL_LOG_FORMAT' (options [\"JSON\", \"TEXT\"])")
 	rootCmd.PersistentFlags().String("log-level", "INFO", "overrides environment variable 'OPSLEVEL_LOG_LEVEL' (options [\"ERROR\", \"WARN\", \"INFO\", \"DEBUG\"])")
 
@@ -41,6 +45,8 @@ func init() {
 	viper.BindEnv("app-url", "OPSLEVEL_APP_URL")
 	viper.BindEnv("log-format", "OPSLEVEL_LOG_FORMAT")
 	viper.BindEnv("log-level", "OPSLEVEL_LOG_LEVEL")
+	viper.BindEnv("api-url", "OPSLEVEL_API_URL")
+	viper.BindEnv("api-token", "OPSLEVEL_API_TOKEN")
 	viper.BindEnv("pod-max-wait", "OPSLEVEL_POD_MAX_WAIT")
 	viper.BindEnv("pod-shell", "OPSLEVEL_POD_SHELL")
 	viper.BindEnv("pod-log-max-interval", "OPSLEVEL_POD_LOG_MAX_INTERVAL")
@@ -99,4 +105,13 @@ func setupLogging() {
 	default:
 		zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	}
+}
+
+var _clientGQL *opslevel.Client
+
+func getClientGQL() *opslevel.Client {
+	if _clientGQL == nil {
+		_clientGQL = pkg.NewGraphClient(version)
+	}
+	return _clientGQL
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/opslevel/opslevel-go"
 	"github.com/opslevel/opslevel-runner/pkg"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -33,10 +34,10 @@ func doTest(cmd *cobra.Command, args []string) error {
 	runner, err := pkg.NewJobRunner()
 	cobra.CheckErr(err)
 
-	return runner.Run(job)
+	return runner.Run(*job)
 }
 
-func readJobInput() (*pkg.JobSchema, error) {
+func readJobInput() (*opslevel.Job, error) {
 	if jobFile == "" {
 		return nil, fmt.Errorf("please specify a job file")
 	}
@@ -54,7 +55,7 @@ func readJobInput() (*pkg.JobSchema, error) {
 			return nil, err
 		}
 	}
-	job := &pkg.JobSchema{}
+	job := &opslevel.Job{}
 	viper.Unmarshal(&job)
 	return job, nil
 }
