@@ -60,5 +60,4 @@ require (
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )
 
-// Uncomment for local development
-// replace github.com/opslevel/opslevel-go => ../../opslevel-go
+replace github.com/opslevel/opslevel-go => ./submodules/opslevel-go
