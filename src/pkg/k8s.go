@@ -22,7 +22,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-func getPodEnv(configs []opslevel.JobVariable) []corev1.EnvVar {
+func getPodEnv(configs []opslevel.RunnerJobVariable) []corev1.EnvVar {
 	output := []corev1.EnvVar{}
 	for _, config := range configs {
 		output = append(output, corev1.EnvVar{
@@ -33,10 +33,10 @@ func getPodEnv(configs []opslevel.JobVariable) []corev1.EnvVar {
 	return output
 }
 
-func getPodObject(job opslevel.Job) *corev1.Pod {
+func getPodObject(job opslevel.RunnerJob) *corev1.Pod {
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("opslevel-job-%s-%d", job.Id, time.Now().Unix()),
+			Name:      fmt.Sprintf("opslevel-job-%s-%d", strings.ToLower(job.Id.(string)), time.Now().Unix()),
 			Namespace: "default",
 			Labels: map[string]string{
 				"app": "demo",
@@ -76,7 +76,7 @@ type JobRunner struct {
 	clientset *kubernetes.Clientset
 }
 
-func (s *JobRunner) Run(job opslevel.Job) error {
+func (s *JobRunner) Run(job opslevel.RunnerJob) error {
 	id := job.Id.(string)
 	// TODO: manage pods based on image for re-use?
 	pod, err := s.CreatePod(getPodObject(job))

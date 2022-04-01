@@ -30,6 +30,9 @@ func doTest(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	if job.Id == nil {
+		job.Id = "1"
+	}
 
 	runner, err := pkg.NewJobRunner()
 	cobra.CheckErr(err)
@@ -37,7 +40,7 @@ func doTest(cmd *cobra.Command, args []string) error {
 	return runner.Run(*job)
 }
 
-func readJobInput() (*opslevel.Job, error) {
+func readJobInput() (*opslevel.RunnerJob, error) {
 	if jobFile == "" {
 		return nil, fmt.Errorf("please specify a job file")
 	}
@@ -55,7 +58,7 @@ func readJobInput() (*opslevel.Job, error) {
 			return nil, err
 		}
 	}
-	job := &opslevel.Job{}
+	job := &opslevel.RunnerJob{}
 	viper.Unmarshal(&job)
 	return job, nil
 }
