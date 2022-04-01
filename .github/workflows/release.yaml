@@ -1,0 +1,73 @@
+name: Release
+on:
+  push:
+    tags:
+      - 'v*'
+jobs:
+  goreleaser:
+    runs-on: ubuntu-18.04 # 20.04 doesn't provide createrepo for now
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Get the tag name
+        run: echo "TAG=$(git describe --tags $(git rev-list --tags --max-count=1))" >> $GITHUB_ENV
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.16
+      - name: Cache Go modules
+        uses: actions/cache@v2
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      - name: Import GPG key
+        id: import_gpg
+        uses: hashicorp/ghaction-import-gpg@v2.1.0
+        env:
+          # These secrets will need to be configured for the repository:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+      - name: Login to Public ECR
+        uses: docker/login-action@v1
+        with:
+          registry: public.ecr.aws
+          username: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          password: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        env:
+          AWS_REGION: us-east-1
+      # - name: Cache Docker Layers
+      #   run: docker pull public.ecr.aws/opslevel/cli:v0.3.0 || true
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v2
+        with:
+          version: latest
+          args: release --rm-dist  --release-notes=../changes/${{ env.TAG }}.md
+          workdir: ./src
+        env:
+          GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
+          # GitHub sets this automatically
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+      # - name: Checkout cli-repo
+      #   uses: actions/checkout@v2
+      #   with:
+      #     repository: ${{ github.repository_owner }}/cli-repo
+      #     path: cli-repo
+      #     fetch-depth: 0
+      #     token: ${{ secrets.ORG_GITHUB_TOKEN }}
+      # - name: Setup git settings
+      #   run: |
+      #     git config --global user.email "info@opslevel.com"
+      #     git config --global user.name "OpsLevel"
+      # - name: Install DEB/RPM dependencies
+      #   run: |
+      #     sudo apt-get -y update
+      #     sudo apt-get -y install rpm reprepro createrepo distro-info
+      # - name: Create rpm repository
+      #   run: ci/deploy-rpm.sh
+      # - name: Create deb repository
+      #   run: ci/deploy-deb.sh
