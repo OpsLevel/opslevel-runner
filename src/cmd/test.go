@@ -6,6 +6,7 @@ import (
 
 	"github.com/opslevel/opslevel-go"
 	"github.com/opslevel/opslevel-runner/pkg"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -33,11 +34,20 @@ func doTest(cmd *cobra.Command, args []string) error {
 	if job.Id == nil {
 		job.Id = "1"
 	}
-
-	runner, err := pkg.NewJobRunner()
+	var stdout, stderr pkg.SafeBuffer
+	streamer := pkg.NewLogStreamer(log.Logger, &stdout, &stderr)
+	runner, err := pkg.NewJobRunner(0, &stdout, &stderr)
 	cobra.CheckErr(err)
 
-	return runner.Run(*job)
+	go streamer.Run(0)
+
+	outcome := runner.Run(*job)
+
+	streamer.Flush()
+	if outcome.Outcome != opslevel.RunnerJobOutcomeEnumSuccess {
+		return fmt.Errorf(outcome.Message)
+	}
+	return nil
 }
 
 func readJobInput() (*opslevel.RunnerJob, error) {

@@ -18,7 +18,6 @@ import (
 
 	"github.com/opslevel/opslevel-go"
 	"github.com/rs/zerolog/log"
-	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
@@ -67,62 +66,24 @@ type JobConfig struct {
 	PodName       string
 	ContainerName string
 	Stdin         io.Reader
-	Stdout        io.Writer
-	Stderr        io.Writer
+	Stdout        *SafeBuffer
+	Stderr        *SafeBuffer
 }
 
 type JobRunner struct {
+	index     int
 	config    *rest.Config
 	clientset *kubernetes.Clientset
+	stdout    *SafeBuffer
+	stderr    *SafeBuffer
 }
 
-func (s *JobRunner) Run(job opslevel.RunnerJob) error {
-	id := job.Id.(string)
-	// TODO: manage pods based on image for re-use?
-	pod, err := s.CreatePod(getPodObject(job))
-	cobra.CheckErr(err)
-
-	// NOTE: do not use cobra.CheckErr after this point because this defer will never happen because os.Exit(1)
-	// TODO: if we reuse pods then delete should not happen
-	defer s.DeletePod(pod)
-
-	// TODO: configurable timeout
-	timeout := time.Second * time.Duration(viper.GetInt("pod-max-wait"))
-	waitErr := s.WaitForPod(pod, timeout)
-	if waitErr != nil {
-		// TODO: Stream error back to OpsLevel for JobId
-		// TODO: get pod status or status message?
-		log.Error().Err(waitErr).Msgf("[%s] pod was not ready in %v", id, timeout)
-		return nil
-	}
-	var stdout, stderr SafeBuffer
-	// TODO: this log streamer should probably be used for All "job" logging to capture errors
-	writer := NewOpsLevelLogWriter(id, time.Second*time.Duration(viper.GetInt("pod-log-max-interval")), viper.GetInt("pod-log-max-size"))
-	streamer := NewLogStreamer(log.Logger, &stdout, &stderr)
-	// TODO: Cleanup this streamer when run is a long lived process?
-	go streamer.Run(id)
-
-	working_directory := fmt.Sprintf("/jobs/%s/", id)
-	// Use Per Job directory?
-	commands := append([]string{fmt.Sprintf("mkdir -p %s", working_directory), fmt.Sprintf("cd %s", working_directory)}, job.Commands...)
-	runErr := s.Exec(&stdout, &stderr, pod, pod.Spec.Containers[0].Name, viper.GetString("pod-shell"), "-e", "-c", strings.Join(commands, ";\n"))
-	if runErr != nil {
-		// TODO: Stream Error back to OpsLevel for JobId
-		log.Error().Err(runErr).Msgf("[%s] %s", id, strings.TrimSuffix(stderr.String(), "\n"))
-		return nil
-	}
-
-	// wait for buffer to empty ...
-	for len(stdout.String()) > 0 {
-		time.Sleep(time.Millisecond * 200)
-	}
-	// we need to flush the writer when the job is over - not sure this is the best way
-	writer.Emit()
-
-	return nil
+type JobOutcome struct {
+	Message string
+	Outcome opslevel.RunnerJobOutcomeEnum
 }
 
-func NewJobRunner() (*JobRunner, error) {
+func NewJobRunner(index int, stdout, stderr *SafeBuffer) (*JobRunner, error) {
 	config, err := getKubernetesConfig()
 	if err != nil {
 		return nil, err
@@ -132,9 +93,60 @@ func NewJobRunner() (*JobRunner, error) {
 		return nil, err
 	}
 	return &JobRunner{
+		index:     index,
 		config:    config,
 		clientset: clientset,
+		stdout:    stdout,
+		stderr:    stderr,
 	}, nil
+}
+
+func (s *JobRunner) Run(job opslevel.RunnerJob) JobOutcome {
+	id := job.Id.(string)
+	// TODO: manage pods based on image for re-use?
+	pod, podErr := s.CreatePod(getPodObject(job))
+	if podErr != nil {
+		return JobOutcome{
+			Message: fmt.Sprintf("failed to create pod REASON: %s", podErr),
+			Outcome: opslevel.RunnerJobOutcomeEnumFailed,
+		}
+	}
+
+	// NOTE: do not use cobra.CheckErr after this point because this defer will never happen because os.Exit(1)
+	// TODO: if we reuse pods then delete should not happen
+	defer s.DeletePod(pod)
+
+	// TODO: configurable timeout
+	timeout := time.Second * time.Duration(viper.GetInt("pod-max-wait"))
+	waitErr := s.WaitForPod(pod, timeout)
+	if waitErr != nil {
+		// TODO: get pod status or status message?
+		return JobOutcome{
+			Message: fmt.Sprintf("pod was not ready in %v REASON: %s", timeout, waitErr),
+			Outcome: opslevel.RunnerJobOutcomeEnumQueueTimeout,
+		}
+	}
+
+	// // TODO: this log streamer should probably be used for All "job" logging to capture errors
+	//writer := NewOpsLevelLogWriter(s.index, time.Second*time.Duration(viper.GetInt("pod-log-max-interval")), viper.GetInt("pod-log-max-size"))
+
+	working_directory := fmt.Sprintf("/jobs/%s/", id)
+	commands := append([]string{fmt.Sprintf("mkdir -p %s", working_directory), fmt.Sprintf("cd %s", working_directory)}, job.Commands...)
+	runErr := s.Exec(s.stdout, s.stderr, pod, pod.Spec.Containers[0].Name, viper.GetString("pod-shell"), "-e", "-c", strings.Join(commands, ";\n"))
+	if runErr != nil {
+		return JobOutcome{
+			Message: fmt.Sprintf("pod execution failed REASON: %s %s", strings.TrimSuffix(s.stderr.String(), "\n"), runErr),
+			Outcome: opslevel.RunnerJobOutcomeEnumFailed,
+		}
+	}
+
+	// // we need to flush the writer when the job is over - not sure this is the best way
+	//writer.Emit()
+
+	return JobOutcome{
+		Message: "",
+		Outcome: opslevel.RunnerJobOutcomeEnumSuccess,
+	}
 }
 
 func getKubernetesClientset() (*kubernetes.Clientset, error) {
@@ -160,9 +172,9 @@ func getKubernetesConfig() (*rest.Config, error) {
 	return config, nil
 }
 
-func (r *JobRunner) ExecWithConfig(config JobConfig) error {
+func (s *JobRunner) ExecWithConfig(config JobConfig) error {
 
-	req := r.clientset.CoreV1().RESTClient().Post().
+	req := s.clientset.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(config.PodName).
 		Namespace(config.Namespace).
@@ -176,8 +188,9 @@ func (r *JobRunner) ExecWithConfig(config JobConfig) error {
 		Stderr:    config.Stderr != nil,
 		TTY:       false,
 	}, scheme.ParameterCodec)
-	log.Trace().Msgf("ExecWithOptions: execute(POST %s)", req.URL())
-	exec, err := remotecommand.NewSPDYExecutor(r.config, "POST", req.URL())
+	log.Debug().Msgf("[%d] Execing pod %s/%s ...", s.index, config.Namespace, config.PodName)
+	log.Trace().Msgf("[%d] ExecWithOptions: execute(POST %s)", s.index, req.URL())
+	exec, err := remotecommand.NewSPDYExecutor(s.config, "POST", req.URL())
 	if err != nil {
 		return err
 	}
@@ -189,8 +202,8 @@ func (r *JobRunner) ExecWithConfig(config JobConfig) error {
 	})
 }
 
-func (r *JobRunner) Exec(stdout, stderr io.Writer, pod *corev1.Pod, containerName string, cmd ...string) error {
-	return r.ExecWithConfig(JobConfig{
+func (s *JobRunner) Exec(stdout, stderr *SafeBuffer, pod *corev1.Pod, containerName string, cmd ...string) error {
+	return s.ExecWithConfig(JobConfig{
 		Command:       cmd,
 		Namespace:     pod.Namespace,
 		PodName:       pod.Name,
@@ -201,21 +214,18 @@ func (r *JobRunner) Exec(stdout, stderr io.Writer, pod *corev1.Pod, containerNam
 	})
 }
 
-func (r *JobRunner) CreatePod(podConfig *corev1.Pod) (*corev1.Pod, error) {
-	log.Info().Msgf("Creating pod %s/%s ...", podConfig.Namespace, podConfig.Name)
-	return r.clientset.CoreV1().Pods(podConfig.Namespace).Create(context.TODO(), podConfig, metav1.CreateOptions{})
+func (s *JobRunner) CreatePod(podConfig *corev1.Pod) (*corev1.Pod, error) {
+	log.Trace().Msgf("[%d] Creating pod %s/%s ...", s.index, podConfig.Namespace, podConfig.Name)
+	return s.clientset.CoreV1().Pods(podConfig.Namespace).Create(context.TODO(), podConfig, metav1.CreateOptions{})
 }
 
-func (r *JobRunner) WaitForPod(podConfig *corev1.Pod, timeout time.Duration) error {
-	log.Info().Msgf("Waiting for pod %s/%s to be ready in %s ...", podConfig.Namespace, podConfig.Name, timeout)
+func (s *JobRunner) WaitForPod(podConfig *corev1.Pod, timeout time.Duration) error {
+	log.Debug().Msgf("[%d] Waiting for pod %s/%s to be ready in %s ...", s.index, podConfig.Namespace, podConfig.Name, timeout)
 	return wait.PollImmediate(time.Second, timeout, func() (bool, error) {
-		// TODO: progress bar?
-
-		pod, err := r.clientset.CoreV1().Pods(podConfig.Namespace).Get(context.TODO(), podConfig.Name, metav1.GetOptions{})
+		pod, err := s.clientset.CoreV1().Pods(podConfig.Namespace).Get(context.TODO(), podConfig.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
-
 		switch pod.Status.Phase {
 		case corev1.PodRunning:
 			return true, nil
@@ -226,7 +236,7 @@ func (r *JobRunner) WaitForPod(podConfig *corev1.Pod, timeout time.Duration) err
 	})
 }
 
-func (r *JobRunner) DeletePod(podConfig *corev1.Pod) error {
-	log.Info().Msgf("Deleting pod %s/%s ...", podConfig.Namespace, podConfig.Name)
-	return r.clientset.CoreV1().Pods(podConfig.Namespace).Delete(context.TODO(), podConfig.Name, metav1.DeleteOptions{})
+func (s *JobRunner) DeletePod(podConfig *corev1.Pod) error {
+	log.Trace().Msgf("[%d] Deleting pod %s/%s ...", s.index, podConfig.Namespace, podConfig.Name)
+	return s.clientset.CoreV1().Pods(podConfig.Namespace).Delete(context.TODO(), podConfig.Name, metav1.DeleteOptions{})
 }

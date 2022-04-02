@@ -18,12 +18,12 @@ func NewLogStreamer(logger zerolog.Logger, stdout, stderr *SafeBuffer) LogStream
 	return LogStreamer{logger: logger, stdout: stdout, stderr: stderr}
 }
 
-func (s LogStreamer) Run(job_id string) {
+func (s *LogStreamer) Run(index int) {
 	for {
 		for len(s.stdout.String()) > 0 {
 			line, err := s.stdout.ReadString('\n')
 			if err == nil {
-				logLine := fmt.Sprintf("[%s] %s", job_id, strings.TrimSuffix(line, "\n"))
+				logLine := fmt.Sprintf("[%d] %s", index, strings.TrimSuffix(line, "\n"))
 				// TODO: Sanitize Log Line
 				s.logger.Info().Msgf(logLine)
 			}
@@ -31,11 +31,17 @@ func (s LogStreamer) Run(job_id string) {
 		for len(s.stderr.String()) > 0 {
 			line, err := s.stderr.ReadString('\n')
 			if err == nil {
-				logLine := fmt.Sprintf("[%s] %s", job_id, strings.TrimSuffix(line, "\n"))
+				logLine := fmt.Sprintf("[%d] %s", index, strings.TrimSuffix(line, "\n"))
 				// TODO: Sanitize Log Line
 				s.logger.Error().Msgf(logLine)
 			}
 		}
+	}
+}
+
+func (s *LogStreamer) Flush() {
+	for len(s.stdout.String()) > 0 {
+		time.Sleep(time.Millisecond * 200)
 	}
 }
 
@@ -47,9 +53,9 @@ type OpsLevelLogWriter struct {
 	timeSinceLastEmit time.Time
 }
 
-func NewOpsLevelLogWriter(jobID string, maxTime time.Duration, maxSize int) OpsLevelLogWriter {
+func NewOpsLevelLogWriter(id string, maxTime time.Duration, maxSize int) OpsLevelLogWriter {
 	return OpsLevelLogWriter{
-		id:                jobID,
+		id:                id,
 		maxTime:           maxTime,
 		maxSize:           maxSize,
 		cache:             []byte{},
