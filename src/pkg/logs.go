@@ -5,17 +5,25 @@ import (
 	"strings"
 	"time"
 
+	"github.com/opslevel/opslevel-go"
 	"github.com/rs/zerolog"
 )
 
 type LogStreamer struct {
-	logger zerolog.Logger
-	stdout *SafeBuffer
-	stderr *SafeBuffer
+	logger    zerolog.Logger
+	stdout    *SafeBuffer
+	stderr    *SafeBuffer
+	variables []opslevel.RunnerJobVariable
 }
 
-func NewLogStreamer(logger zerolog.Logger, stdout, stderr *SafeBuffer) LogStreamer {
-	return LogStreamer{logger: logger, stdout: stdout, stderr: stderr}
+func NewLogStreamer(logger zerolog.Logger, stdout, stderr *SafeBuffer, variables []opslevel.RunnerJobVariable) LogStreamer {
+	secrets := []opslevel.RunnerJobVariable{}
+	for _, variable := range variables {
+		if variable.Sensitive {
+			secrets = append(secrets, variable)
+		}
+	}
+	return LogStreamer{logger: logger, stdout: stdout, stderr: stderr, variables: secrets}
 }
 
 func (s *LogStreamer) Run(index int) {
@@ -23,20 +31,26 @@ func (s *LogStreamer) Run(index int) {
 		for len(s.stdout.String()) > 0 {
 			line, err := s.stdout.ReadString('\n')
 			if err == nil {
-				logLine := fmt.Sprintf("[%d] %s", index, strings.TrimSuffix(line, "\n"))
-				// TODO: Sanitize Log Line
+				logLine := s.Sanitize(fmt.Sprintf("[%d] %s", index, strings.TrimSuffix(line, "\n")))
 				s.logger.Info().Msgf(logLine)
 			}
 		}
 		for len(s.stderr.String()) > 0 {
 			line, err := s.stderr.ReadString('\n')
 			if err == nil {
-				logLine := fmt.Sprintf("[%d] %s", index, strings.TrimSuffix(line, "\n"))
-				// TODO: Sanitize Log Line
+				logLine := s.Sanitize(fmt.Sprintf("[%d] %s", index, strings.TrimSuffix(line, "\n")))
 				s.logger.Error().Msgf(logLine)
 			}
 		}
 	}
+}
+
+func (s *LogStreamer) Sanitize(input string) string {
+	scrubbed := input
+	for _, variable := range s.variables {
+		scrubbed = strings.ReplaceAll(scrubbed, variable.Value, "**********")
+	}
+	return scrubbed
 }
 
 func (s *LogStreamer) Flush() {

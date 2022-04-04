@@ -35,7 +35,7 @@ func doTest(cmd *cobra.Command, args []string) error {
 		job.Id = "1"
 	}
 	var stdout, stderr pkg.SafeBuffer
-	streamer := pkg.NewLogStreamer(log.Logger, &stdout, &stderr)
+	streamer := pkg.NewLogStreamer(log.Logger, &stdout, &stderr, job.Variables)
 	runner, err := pkg.NewJobRunner(0, &stdout, &stderr)
 	cobra.CheckErr(err)
 
