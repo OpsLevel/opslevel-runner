@@ -40,8 +40,8 @@ jobs:
           password: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         env:
           AWS_REGION: us-east-1
-      # - name: Cache Docker Layers
-      #   run: docker pull public.ecr.aws/opslevel/cli:v0.3.0 || true
+      - name: Cache Docker Layers
+        run: docker pull public.ecr.aws/opslevel/opslevel-runner:v0.1.0 || true
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v2
         with:
