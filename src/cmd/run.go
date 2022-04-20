@@ -74,13 +74,15 @@ func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 
 func jobPoller(runnerId string, jobQueue chan<- opslevel.RunnerJob) {
 	client := getClientGQL()
+	token := opslevel.NewID("")
 	poll_wait_time := time.Second * time.Duration(viper.GetInt("poll-interval"))
 	log.Info().Msg("[0] Starting polling for jobs")
 	for {
 		log.Trace().Msg("[0] Polling for jobs ...")
 		continue_polling := true
 		for continue_polling {
-			job, err := client.GetPendingJob(runnerId)
+			job, nextToken, err := client.GetPendingJob(runnerId, token)
+			token = nextToken
 			if err != nil {
 				log.Error().Err(err).Msg("[0] got error when getting pending job")
 				continue_polling = false
