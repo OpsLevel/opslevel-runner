@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"runtime"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -90,9 +91,17 @@ func init() {
 	rootCmd.AddCommand(versionCmd)
 }
 
-func runVersion(cmd *cobra.Command, args []string) {
+func logVersion() {
 	initBuild()
-	versionInfo, err := json.MarshalIndent(build, "", "  ")
-	cobra.CheckErr(err)
+	log.Info().Msgf("Runner Version: %s-%s", build.OpslevelVersion.Version, build.OpslevelVersion.Commit)
+}
+
+func printVersion() {
+	initBuild()
+	versionInfo, _ := json.MarshalIndent(build, "", "  ")
 	fmt.Println(string(versionInfo))
+}
+
+func runVersion(cmd *cobra.Command, args []string) {
+	printVersion()
 }

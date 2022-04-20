@@ -26,6 +26,8 @@ func init() {
 }
 
 func doRun(cmd *cobra.Command, args []string) {
+	logVersion()
+
 	runnerId := args[0]
 	jobQueue := make(chan opslevel.RunnerJob)
 	// Validate we can create a graphql client
@@ -57,7 +59,7 @@ func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 		outcome := runner.Run(job)
 		log.Info().Msgf("[%d] Finished job '%s' with outcome '%s'", index, job.Id, outcome.Outcome)
 		if outcome.Outcome != opslevel.RunnerJobOutcomeEnumSuccess {
-			log.Debug().Msgf("[%d] Job '%s' failed REASON: %s", index, job.Id, outcome.Message)
+			log.Warn().Msgf("[%d] Job '%s' failed REASON: %s", index, job.Id, outcome.Message)
 		}
 		_, err := client.ReportJobOutcome(opslevel.RunnerReportJobOutcomeInput{
 			RunnerId:    runnerId,
@@ -75,7 +77,7 @@ func jobPoller(runnerId string, jobQueue chan<- opslevel.RunnerJob) {
 	poll_wait_time := time.Second * time.Duration(viper.GetInt("poll-interval"))
 	log.Info().Msg("[0] Starting polling for jobs")
 	for {
-		log.Debug().Msg("[0] Polling for jobs ...")
+		log.Trace().Msg("[0] Polling for jobs ...")
 		continue_polling := true
 		for continue_polling {
 			job, err := client.GetPendingJob(runnerId)
@@ -91,7 +93,7 @@ func jobPoller(runnerId string, jobQueue chan<- opslevel.RunnerJob) {
 				}
 			}
 		}
-		log.Debug().Msgf("[0] Finished Polling for jobs sleeping for %s ...", poll_wait_time)
+		log.Trace().Msgf("[0] Finished Polling for jobs sleeping for %s ...", poll_wait_time)
 		time.Sleep(poll_wait_time)
 	}
 }
