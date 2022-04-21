@@ -1,60 +1,67 @@
 package pkg
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
-	"github.com/opslevel/opslevel-go"
 	"github.com/rs/zerolog"
 )
+
+type LogProcessor interface {
+	Process(line string) string
+}
 
 type LogStreamer struct {
 	logger    zerolog.Logger
 	stdout    *SafeBuffer
 	stderr    *SafeBuffer
-	variables []opslevel.RunnerJobVariable
+	processors []LogProcessor
 }
 
-func NewLogStreamer(logger zerolog.Logger, stdout, stderr *SafeBuffer, variables []opslevel.RunnerJobVariable) LogStreamer {
-	secrets := []opslevel.RunnerJobVariable{}
-	for _, variable := range variables {
-		if variable.Sensitive {
-			secrets = append(secrets, variable)
-		}
+func NewLogStreamer(logger zerolog.Logger, stdout, stderr *SafeBuffer, processors []LogProcessor) LogStreamer {
+	return LogStreamer{
+		logger: logger,
+		stdout: stdout,
+		stderr: stderr,
+		processors: processors,
 	}
-	return LogStreamer{logger: logger, stdout: stdout, stderr: stderr, variables: secrets}
 }
 
 func (s *LogStreamer) Run(index int) {
+	// TODO: line := fmt.Sprintf("[%d] %s", index, line))
 	for {
 		for len(s.stdout.String()) > 0 {
 			line, err := s.stdout.ReadString('\n')
 			if err == nil {
-				logLine := s.Sanitize(fmt.Sprintf("[%d] %s", index, strings.TrimSuffix(line, "\n")))
-				s.logger.Info().Msgf(logLine)
+				line = strings.TrimSuffix(line, "\n")
+				for _, processor := range s.processors {
+					line = processor.Process(line)
+				}
+				if len(line) > 0 {
+					s.logger.Info().Msgf(line)
+				}
 			}
 		}
 		for len(s.stderr.String()) > 0 {
 			line, err := s.stderr.ReadString('\n')
 			if err == nil {
-				logLine := s.Sanitize(fmt.Sprintf("[%d] %s", index, strings.TrimSuffix(line, "\n")))
-				s.logger.Error().Msgf(logLine)
+				line = strings.TrimSuffix(line, "\n")
+				for _, processor := range s.processors {
+					line = processor.Process(line)
+				}
+				if len(line) > 0 {
+					s.logger.Error().Msgf(line)
+				}
 			}
 		}
 	}
 }
 
-func (s *LogStreamer) Sanitize(input string) string {
-	scrubbed := input
-	for _, variable := range s.variables {
-		scrubbed = strings.ReplaceAll(scrubbed, variable.Value, "**********")
-	}
-	return scrubbed
-}
-
 func (s *LogStreamer) Flush() {
 	for len(s.stdout.String()) > 0 {
+		time.Sleep(time.Millisecond * 200)
+	}
+	for len(s.stderr.String()) > 0 {
 		time.Sleep(time.Millisecond * 200)
 	}
 }

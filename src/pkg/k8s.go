@@ -116,7 +116,6 @@ func (s *JobRunner) Run(job opslevel.RunnerJob) JobOutcome {
 	// TODO: if we reuse pods then delete should not happen
 	defer s.DeletePod(pod)
 
-	// TODO: configurable timeout
 	timeout := time.Second * time.Duration(viper.GetInt("pod-max-wait"))
 	waitErr := s.WaitForPod(pod, timeout)
 	if waitErr != nil {

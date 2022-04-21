@@ -4,6 +4,7 @@ go 1.17
 
 require (
 	github.com/opslevel/opslevel-go v0.4.5-0.20220225194148-bc75f2c38d93
+	github.com/rocktavious/autopilot v0.1.5
 	github.com/rs/zerolog v1.26.1
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/viper v1.8.1
