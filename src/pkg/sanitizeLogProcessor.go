@@ -1,10 +1,10 @@
 package pkg
 
 import (
-	"github.com/opslevel/opslevel-go"
 	"strings"
-)
 
+	"github.com/opslevel/opslevel-go"
+)
 
 type SanitizeLogProcessor struct {
 	variables []opslevel.RunnerJobVariable
@@ -22,9 +22,9 @@ func NewSanitizeLogProcessor(variables []opslevel.RunnerJobVariable) *SanitizeLo
 	}
 }
 
-func (m *SanitizeLogProcessor) Process(line string) string {
+func (s *SanitizeLogProcessor) Process(line string) string {
 	scrubbed := line
-	for _, variable := range m.variables {
+	for _, variable := range s.variables {
 		scrubbed = strings.ReplaceAll(scrubbed, variable.Value, "**********")
 	}
 	return scrubbed

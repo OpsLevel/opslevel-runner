@@ -3,48 +3,52 @@ package pkg
 import (
 	"regexp"
 	"sync"
+
+	"github.com/rs/zerolog/log"
 )
 
 type OutcomeVariable struct {
-	Key string
+	Key   string
 	Value string
 }
 
 type SetOutcomeVarLogProcessor struct {
-	mutex sync.Mutex
-	regex *regexp.Regexp
-	keyIndex int
+	mutex      sync.Mutex
+	regex      *regexp.Regexp
+	keyIndex   int
 	valueIndex int
-	vars []OutcomeVariable
+	vars       []OutcomeVariable
 }
 
 func NewSetOutcomeVarLogProcessor() *SetOutcomeVarLogProcessor {
 	exp := regexp.MustCompile(`^::set-outcome-var\s(?P<Key>[\w-]+)=(?P<Value>.*)`)
 	return &SetOutcomeVarLogProcessor{
-		mutex: sync.Mutex{},
-		regex: exp,
-		keyIndex: exp.SubexpIndex("Key"),
+		mutex:      sync.Mutex{},
+		regex:      exp,
+		keyIndex:   exp.SubexpIndex("Key"),
 		valueIndex: exp.SubexpIndex("Value"),
-		vars: []OutcomeVariable{},
+		vars:       []OutcomeVariable{},
 	}
 }
 
-func (c *SetOutcomeVarLogProcessor) Process(line string) string {
-	data := c.regex.FindStringSubmatch(line)
+func (s *SetOutcomeVarLogProcessor) Process(line string) string {
+	data := s.regex.FindStringSubmatch(line)
 	if len(data) > 0 {
-		c.mutex.Lock()
-		defer c.mutex.Unlock()
-		c.vars = append(c.vars, OutcomeVariable{
-			Key: data[c.keyIndex],
-			Value: data[c.valueIndex],
+		s.mutex.Lock()
+		defer s.mutex.Unlock()
+		s.vars = append(s.vars, OutcomeVariable{
+			Key:   data[s.keyIndex],
+			Value: data[s.valueIndex],
 		})
 		return ""
 	}
 	return line
 }
 
-func (c *SetOutcomeVarLogProcessor) Variables() []OutcomeVariable {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	return c.vars
+func (s *SetOutcomeVarLogProcessor) Flush() {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	for _, v := range s.vars {
+		log.Info().Msgf("Outcome Variable | '%s'='%s'", v.Key, v.Value)
+	}
 }

@@ -3,8 +3,6 @@ package pkg
 import (
 	"strings"
 	"time"
-
-	"github.com/rs/zerolog"
 )
 
 type LogProcessor interface {
@@ -12,45 +10,36 @@ type LogProcessor interface {
 }
 
 type LogStreamer struct {
-	logger    zerolog.Logger
-	stdout    *SafeBuffer
-	stderr    *SafeBuffer
+	Stdout     *SafeBuffer
+	Stderr     *SafeBuffer
 	processors []LogProcessor
 }
 
-func NewLogStreamer(logger zerolog.Logger, stdout, stderr *SafeBuffer, processors []LogProcessor) LogStreamer {
+func NewLogStreamer(processors... LogProcessor) LogStreamer {
 	return LogStreamer{
-		logger: logger,
-		stdout: stdout,
-		stderr: stderr,
+		Stdout:     &SafeBuffer{},
+		Stderr:     &SafeBuffer{},
 		processors: processors,
 	}
 }
 
-func (s *LogStreamer) Run(index int) {
-	// TODO: line := fmt.Sprintf("[%d] %s", index, line))
+func (s *LogStreamer) Run() {
 	for {
-		for len(s.stdout.String()) > 0 {
-			line, err := s.stdout.ReadString('\n')
+		for len(s.Stderr.String()) > 0 {
+			line, err := s.Stderr.ReadString('\n')
 			if err == nil {
 				line = strings.TrimSuffix(line, "\n")
 				for _, processor := range s.processors {
 					line = processor.Process(line)
-				}
-				if len(line) > 0 {
-					s.logger.Info().Msgf(line)
 				}
 			}
 		}
-		for len(s.stderr.String()) > 0 {
-			line, err := s.stderr.ReadString('\n')
+		for len(s.Stdout.String()) > 0 {
+			line, err := s.Stdout.ReadString('\n')
 			if err == nil {
 				line = strings.TrimSuffix(line, "\n")
 				for _, processor := range s.processors {
 					line = processor.Process(line)
-				}
-				if len(line) > 0 {
-					s.logger.Error().Msgf(line)
 				}
 			}
 		}
@@ -58,10 +47,10 @@ func (s *LogStreamer) Run(index int) {
 }
 
 func (s *LogStreamer) Flush() {
-	for len(s.stdout.String()) > 0 {
+	for len(s.Stderr.String()) > 0 {
 		time.Sleep(time.Millisecond * 200)
 	}
-	for len(s.stderr.String()) > 0 {
+	for len(s.Stdout.String()) > 0 {
 		time.Sleep(time.Millisecond * 200)
 	}
 }

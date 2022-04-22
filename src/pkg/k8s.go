@@ -130,7 +130,7 @@ func (s *JobRunner) Run(job opslevel.RunnerJob) JobOutcome {
 	//writer := NewOpsLevelLogWriter(s.index, time.Second*time.Duration(viper.GetInt("pod-log-max-interval")), viper.GetInt("pod-log-max-size"))
 
 	working_directory := fmt.Sprintf("/jobs/%s/", id)
-	commands := append([]string{fmt.Sprintf("mkdir -p %s", working_directory), fmt.Sprintf("cd %s", working_directory)}, job.Commands...)
+	commands := append([]string{fmt.Sprintf("mkdir -p %s", working_directory), fmt.Sprintf("cd %s", working_directory), "set -xv"}, job.Commands...)
 	runErr := s.Exec(s.stdout, s.stderr, pod, pod.Spec.Containers[0].Name, viper.GetString("pod-shell"), "-e", "-c", strings.Join(commands, ";\n"))
 	if runErr != nil {
 		return JobOutcome{

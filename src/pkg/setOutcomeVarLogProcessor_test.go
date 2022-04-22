@@ -1,8 +1,8 @@
 package pkg
 
 import (
-	"testing"
 	"github.com/rocktavious/autopilot"
+	"testing"
 )
 
 func TestSetOutcomeVarLogProcessor(t *testing.T) {

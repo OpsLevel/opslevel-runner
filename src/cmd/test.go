@@ -34,24 +34,20 @@ func doTest(cmd *cobra.Command, args []string) error {
 	if job.Id == nil {
 		job.Id = "1"
 	}
-	var stdout, stderr pkg.SafeBuffer
-	outcome_processor := pkg.NewSetOutcomeVarLogProcessor()
-	streamer := pkg.NewLogStreamer(log.Logger, &stdout, &stderr,
-		[]pkg.LogProcessor{
-			pkg.NewSanitizeLogProcessor(job.Variables),
-			outcome_processor,
-	})
-	runner, err := pkg.NewJobRunner(0, &stdout, &stderr)
+	streamer := pkg.NewLogStreamer(
+		pkg.NewSetOutcomeVarLogProcessor(),
+		pkg.NewSanitizeLogProcessor(job.Variables),
+		pkg.NewPrefixLogProcessor(fmt.Sprintf("[%d] ", 0)),
+		pkg.NewLoggerLogProcessor(log.Logger))
+	runner, err := pkg.NewJobRunner(0, streamer.Stdout, streamer.Stderr)
 	cobra.CheckErr(err)
 
-	go streamer.Run(0)
+	go streamer.Run()
 
 	outcome := runner.Run(*job)
 
 	streamer.Flush()
-	for _, variable := range outcome_processor.Variables() {
-		log.Info().Msgf("Outcome Variable | '%s'='%s'", variable.Key, variable.Value)
-	}
+
 	if outcome.Outcome != opslevel.RunnerJobOutcomeEnumSuccess {
 		return fmt.Errorf(outcome.Message)
 	}
