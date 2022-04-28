@@ -21,7 +21,47 @@ import (
 	"github.com/spf13/viper"
 )
 
-func getPodEnv(configs []opslevel.RunnerJobVariable) []corev1.EnvVar {
+type JobConfig struct {
+	Command       []string
+	Namespace     string
+	PodName       string
+	ContainerName string
+	Stdin         io.Reader
+	Stdout        *SafeBuffer
+	Stderr        *SafeBuffer
+}
+
+type JobRunner struct {
+	logger    zerolog.Logger
+	namespace string
+	config    *rest.Config
+	clientset *kubernetes.Clientset
+}
+
+type JobOutcome struct {
+	Message string
+	Outcome opslevel.RunnerJobOutcomeEnum
+	OutcomeVariables []opslevel.RunnerJobOutcomeVariable
+}
+
+func NewJobRunner(logger zerolog.Logger, namespace string) (*JobRunner, error) {
+	config, err := getKubernetesConfig()
+	if err != nil {
+		return nil, err
+	}
+	clientset, err := getKubernetesClientset()
+	if err != nil {
+		return nil, err
+	}
+	return &JobRunner{
+		logger:     logger,
+		namespace: namespace,
+		config:    config,
+		clientset: clientset,
+	}, nil
+}
+
+func (s *JobRunner) getPodEnv(configs []opslevel.RunnerJobVariable) []corev1.EnvVar {
 	output := []corev1.EnvVar{}
 	for _, config := range configs {
 		output = append(output, corev1.EnvVar{
@@ -32,11 +72,16 @@ func getPodEnv(configs []opslevel.RunnerJobVariable) []corev1.EnvVar {
 	return output
 }
 
-func getPodObject(job opslevel.RunnerJob) *corev1.Pod {
+func (s *JobRunner) getPodObject(job opslevel.RunnerJob) *corev1.Pod {
+	// TODO: Allow configuration of PullPolicy
+	// TODO: Allow configuration of Labels
+	// TODO: Allow configuration of Annotations
+	// TODO: Allow configuration of Pod Command
+	// TODO: Allow configuration of TerminationGracePeriodSeconds
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("opslevel-job-%s-%d", strings.ToLower(job.Id.(string)), time.Now().Unix()),
-			Namespace: "default",
+			Namespace: s.namespace,
 			Labels: map[string]string{
 				"app": "demo",
 			},
@@ -53,55 +98,18 @@ func getPodObject(job opslevel.RunnerJob) *corev1.Pod {
 						"-c",
 						"while :; do sleep 30; done",
 					},
-					Env: getPodEnv(job.Variables),
+					Env: s.getPodEnv(job.Variables),
 				},
 			},
 		},
 	}
 }
 
-type JobConfig struct {
-	Command       []string
-	Namespace     string
-	PodName       string
-	ContainerName string
-	Stdin         io.Reader
-	Stdout        *SafeBuffer
-	Stderr        *SafeBuffer
-}
-
-type JobRunner struct {
-	logger    zerolog.Logger
-	config    *rest.Config
-	clientset *kubernetes.Clientset
-}
-
-type JobOutcome struct {
-	Message string
-	Outcome opslevel.RunnerJobOutcomeEnum
-	OutcomeVariables []opslevel.RunnerJobOutcomeVariable
-}
-
-func NewJobRunner(logger zerolog.Logger) (*JobRunner, error) {
-	config, err := getKubernetesConfig()
-	if err != nil {
-		return nil, err
-	}
-	clientset, err := getKubernetesClientset()
-	if err != nil {
-		return nil, err
-	}
-	return &JobRunner{
-		logger:     logger,
-		config:    config,
-		clientset: clientset,
-	}, nil
-}
-
+// TODO: Remove all usages of "Viper" they should be passed in at JobRunner configuraiton time
 func (s *JobRunner) Run(job opslevel.RunnerJob, stdout, stderr *SafeBuffer) JobOutcome {
 	id := job.Id.(string)
 	// TODO: manage pods based on image for re-use?
-	pod, podErr := s.CreatePod(getPodObject(job))
+	pod, podErr := s.CreatePod(s.getPodObject(job))
 	if podErr != nil {
 		return JobOutcome{
 			Message: fmt.Sprintf("failed to create pod REASON: %s", podErr),

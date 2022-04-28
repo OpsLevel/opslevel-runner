@@ -47,7 +47,7 @@ func doRun(cmd *cobra.Command, args []string) {
 func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 	logger := log.With().Int("worker", index).Logger()
 	client := getClientGQL()
-	runner, err := pkg.NewJobRunner(logger)
+	runner, err := pkg.NewJobRunner(logger, viper.GetString("pod-namespace"))
 	cobra.CheckErr(err)
 	outcomeProcessor := pkg.NewSetOutcomeVarLogProcessor()
 	// TODO: If Log Level == Trace - add logging processor similar to `test` command?
