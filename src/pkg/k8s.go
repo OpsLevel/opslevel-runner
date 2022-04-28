@@ -17,7 +17,7 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 
 	"github.com/opslevel/opslevel-go"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
 )
 
@@ -71,7 +71,7 @@ type JobConfig struct {
 }
 
 type JobRunner struct {
-	index     int
+	logger    zerolog.Logger
 	config    *rest.Config
 	clientset *kubernetes.Clientset
 }
@@ -82,7 +82,7 @@ type JobOutcome struct {
 	OutcomeVariables []opslevel.RunnerJobOutcomeVariable
 }
 
-func NewJobRunner(index int) (*JobRunner, error) {
+func NewJobRunner(logger zerolog.Logger) (*JobRunner, error) {
 	config, err := getKubernetesConfig()
 	if err != nil {
 		return nil, err
@@ -92,7 +92,7 @@ func NewJobRunner(index int) (*JobRunner, error) {
 		return nil, err
 	}
 	return &JobRunner{
-		index:     index,
+		logger:     logger,
 		config:    config,
 		clientset: clientset,
 	}, nil
@@ -184,8 +184,8 @@ func (s *JobRunner) ExecWithConfig(config JobConfig) error {
 		Stderr:    config.Stderr != nil,
 		TTY:       false,
 	}, scheme.ParameterCodec)
-	log.Debug().Msgf("[%d] Execing pod %s/%s ...", s.index, config.Namespace, config.PodName)
-	log.Trace().Msgf("[%d] ExecWithOptions: execute(POST %s)", s.index, req.URL())
+	s.logger.Debug().Msgf("Execing pod %s/%s ...", config.Namespace, config.PodName)
+	s.logger.Trace().Msgf("ExecWithOptions: execute(POST %s)", req.URL())
 	exec, err := remotecommand.NewSPDYExecutor(s.config, "POST", req.URL())
 	if err != nil {
 		return err
@@ -211,12 +211,12 @@ func (s *JobRunner) Exec(stdout, stderr *SafeBuffer, pod *corev1.Pod, containerN
 }
 
 func (s *JobRunner) CreatePod(podConfig *corev1.Pod) (*corev1.Pod, error) {
-	log.Trace().Msgf("[%d] Creating pod %s/%s ...", s.index, podConfig.Namespace, podConfig.Name)
+	s.logger.Trace().Msgf("Creating pod %s/%s ...", podConfig.Namespace, podConfig.Name)
 	return s.clientset.CoreV1().Pods(podConfig.Namespace).Create(context.TODO(), podConfig, metav1.CreateOptions{})
 }
 
 func (s *JobRunner) WaitForPod(podConfig *corev1.Pod, timeout time.Duration) error {
-	log.Debug().Msgf("[%d] Waiting for pod %s/%s to be ready in %s ...", s.index, podConfig.Namespace, podConfig.Name, timeout)
+	s.logger.Debug().Msgf("Waiting for pod %s/%s to be ready in %s ...", podConfig.Namespace, podConfig.Name, timeout)
 	return wait.PollImmediate(time.Second, timeout, func() (bool, error) {
 		pod, err := s.clientset.CoreV1().Pods(podConfig.Namespace).Get(context.TODO(), podConfig.Name, metav1.GetOptions{})
 		if err != nil {
@@ -233,6 +233,6 @@ func (s *JobRunner) WaitForPod(podConfig *corev1.Pod, timeout time.Duration) err
 }
 
 func (s *JobRunner) DeletePod(podConfig *corev1.Pod) error {
-	log.Trace().Msgf("[%d] Deleting pod %s/%s ...", s.index, podConfig.Namespace, podConfig.Name)
+	s.logger.Trace().Msgf("Deleting pod %s/%s ...", podConfig.Namespace, podConfig.Name)
 	return s.clientset.CoreV1().Pods(podConfig.Namespace).Delete(context.TODO(), podConfig.Name, metav1.DeleteOptions{})
 }

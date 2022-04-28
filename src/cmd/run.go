@@ -45,22 +45,23 @@ func doRun(cmd *cobra.Command, args []string) {
 }
 
 func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
+	logger := log.With().Int("worker", index).Logger()
 	client := getClientGQL()
-	runner, err := pkg.NewJobRunner(index)
+	runner, err := pkg.NewJobRunner(logger)
 	cobra.CheckErr(err)
 	outcomeProcessor := pkg.NewSetOutcomeVarLogProcessor()
 	// TODO: If Log Level == Trace - add logging processor similar to `test` command?
 	streamer := pkg.NewLogStreamer(outcomeProcessor)
 	go streamer.Run()
-	log.Info().Msgf("[%d] Starting job worker ...", index)
+	logger.Info().Msg("Starting job processor ...")
 	for {
 		job := <-jobQueue
-		log.Info().Msgf("[%d] Starting job '%s'", index, job.Id)
+		logger.Info().Msgf("Starting job '%s'", job.Id)
 		outcome := runner.Run(job, streamer.Stdout, streamer.Stderr)
 		streamer.Flush()
-		log.Info().Msgf("[%d] Finished job '%s' with outcome '%s'", index, job.Id, outcome.Outcome)
+		logger.Info().Msgf("Finished job '%s' with outcome '%s'", job.Id, outcome.Outcome)
 		if outcome.Outcome != opslevel.RunnerJobOutcomeEnumSuccess {
-			log.Warn().Msgf("[%d] Job '%s' failed REASON: %s", index, job.Id, outcome.Message)
+			logger.Warn().Msgf("Job '%s' failed REASON: %s", job.Id, outcome.Message)
 		}
 		err = client.ReportJobOutcome(opslevel.RunnerReportJobOutcomeInput{
 			RunnerId:         runnerId,
@@ -70,36 +71,37 @@ func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 		})
 		outcomeProcessor.Clear()
 		if err != nil {
-			log.Error().Err(err).Msgf("[%d] got error when reporting job outcome", index)
+			logger.Error().Err(err).Msg("got error when reporting job outcome")
 		}
 	}
 }
 
 func jobPoller(runnerId string, jobQueue chan<- opslevel.RunnerJob) {
+	logger := log.With().Int("worker", 0).Logger()
 	client := getClientGQL()
 	token := opslevel.NewID("")
 	poll_wait_time := time.Second * time.Duration(viper.GetInt("poll-interval"))
-	log.Info().Msg("[0] Starting polling for jobs")
+	logger.Info().Msg("Starting polling for jobs")
 	for {
-		log.Trace().Msg("[0] Polling for jobs ...")
+		logger.Trace().Msg("Polling for jobs ...")
 		continue_polling := true
 		for continue_polling {
-			log.Debug().Msgf("[0] Get pending jobs with lastUpdateToken '%v' ...", *token)
+			logger.Debug().Msgf("Get pending jobs with lastUpdateToken '%v' ...", *token)
 			job, nextToken, err := client.GetPendingJob(runnerId, token)
 			if err != nil {
-				log.Error().Err(err).Msg("[0] got error when getting pending job")
+				logger.Error().Err(err).Msg("got error when getting pending job")
 				continue_polling = false
 			} else {
 				token = nextToken
 				if job.Id == nil {
 					continue_polling = false
 				} else {
-					log.Debug().Msgf("[0] Enqueuing job '%s'", job.Id)
+					logger.Debug().Msgf("Enqueuing job '%s'", job.Id)
 					jobQueue <- *job
 				}
 			}
 		}
-		log.Trace().Msgf("[0] Finished Polling for jobs sleeping for %s ...", poll_wait_time)
+		logger.Trace().Msgf("Finished Polling for jobs sleeping for %s ...", poll_wait_time)
 		time.Sleep(poll_wait_time)
 	}
 }

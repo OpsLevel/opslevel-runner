@@ -39,7 +39,7 @@ func doTest(cmd *cobra.Command, args []string) error {
 		pkg.NewSanitizeLogProcessor(job.Variables),
 		pkg.NewPrefixLogProcessor(fmt.Sprintf("[%d] ", 0)),
 		pkg.NewLoggerLogProcessor(log.Logger))
-	runner, err := pkg.NewJobRunner(0)
+	runner, err := pkg.NewJobRunner(log.Logger)
 	cobra.CheckErr(err)
 
 	go streamer.Run()
