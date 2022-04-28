@@ -74,16 +74,15 @@ type JobRunner struct {
 	index     int
 	config    *rest.Config
 	clientset *kubernetes.Clientset
-	stdout    *SafeBuffer
-	stderr    *SafeBuffer
 }
 
 type JobOutcome struct {
 	Message string
 	Outcome opslevel.RunnerJobOutcomeEnum
+	OutcomeVariables []opslevel.RunnerJobOutcomeVariable
 }
 
-func NewJobRunner(index int, stdout, stderr *SafeBuffer) (*JobRunner, error) {
+func NewJobRunner(index int) (*JobRunner, error) {
 	config, err := getKubernetesConfig()
 	if err != nil {
 		return nil, err
@@ -96,12 +95,10 @@ func NewJobRunner(index int, stdout, stderr *SafeBuffer) (*JobRunner, error) {
 		index:     index,
 		config:    config,
 		clientset: clientset,
-		stdout:    stdout,
-		stderr:    stderr,
 	}, nil
 }
 
-func (s *JobRunner) Run(job opslevel.RunnerJob) JobOutcome {
+func (s *JobRunner) Run(job opslevel.RunnerJob, stdout, stderr *SafeBuffer) JobOutcome {
 	id := job.Id.(string)
 	// TODO: manage pods based on image for re-use?
 	pod, podErr := s.CreatePod(getPodObject(job))
@@ -131,10 +128,10 @@ func (s *JobRunner) Run(job opslevel.RunnerJob) JobOutcome {
 
 	working_directory := fmt.Sprintf("/jobs/%s/", id)
 	commands := append([]string{fmt.Sprintf("mkdir -p %s", working_directory), fmt.Sprintf("cd %s", working_directory), "set -xv"}, job.Commands...)
-	runErr := s.Exec(s.stdout, s.stderr, pod, pod.Spec.Containers[0].Name, viper.GetString("pod-shell"), "-e", "-c", strings.Join(commands, ";\n"))
+	runErr := s.Exec(stdout, stderr, pod, pod.Spec.Containers[0].Name, viper.GetString("pod-shell"), "-e", "-c", strings.Join(commands, ";\n"))
 	if runErr != nil {
 		return JobOutcome{
-			Message: fmt.Sprintf("pod execution failed REASON: %s %s", strings.TrimSuffix(s.stderr.String(), "\n"), runErr),
+			Message: fmt.Sprintf("pod execution failed REASON: %s %s", strings.TrimSuffix(stderr.String(), "\n"), runErr),
 			Outcome: opslevel.RunnerJobOutcomeEnumFailed,
 		}
 	}

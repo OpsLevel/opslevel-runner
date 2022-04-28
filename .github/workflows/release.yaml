@@ -12,6 +12,8 @@ jobs:
         with:
           fetch-depth: 0
           submodules: 'true'
+      - name: Fetch all tags
+        run: git fetch --force --tags
       - name: Get the tag name
         run: echo "TAG=$(git describe --tags $(git rev-list --tags --max-count=1))" >> $GITHUB_ENV
       - name: Set up Go
@@ -72,3 +74,8 @@ jobs:
       #   run: ci/deploy-rpm.sh
       # - name: Create deb repository
       #   run: ci/deploy-deb.sh
+      - name: Report Release
+        uses: OpsLevel/report-deploy-github-action@v0.2.0
+        with:
+          integration_url: ${{ secrets.DEPLOY_INTEGRATION_URL }}
+          service: "opslevel_runner"

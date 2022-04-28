@@ -1,33 +1,30 @@
 package pkg
 
 import (
+	"github.com/opslevel/opslevel-go"
 	"regexp"
 	"sync"
 
 	"github.com/rs/zerolog/log"
 )
 
-type OutcomeVariable struct {
-	Key   string
-	Value string
-}
+var setOutcomeVarExp = regexp.MustCompile(`^::set-outcome-var\s(?P<Key>[\w-]+)=(?P<Value>.*)`)
 
 type SetOutcomeVarLogProcessor struct {
 	mutex      sync.Mutex
 	regex      *regexp.Regexp
 	keyIndex   int
 	valueIndex int
-	vars       []OutcomeVariable
+	vars       []opslevel.RunnerJobOutcomeVariable
 }
 
 func NewSetOutcomeVarLogProcessor() *SetOutcomeVarLogProcessor {
-	exp := regexp.MustCompile(`^::set-outcome-var\s(?P<Key>[\w-]+)=(?P<Value>.*)`)
 	return &SetOutcomeVarLogProcessor{
 		mutex:      sync.Mutex{},
-		regex:      exp,
-		keyIndex:   exp.SubexpIndex("Key"),
-		valueIndex: exp.SubexpIndex("Value"),
-		vars:       []OutcomeVariable{},
+		regex:      setOutcomeVarExp,
+		keyIndex:   setOutcomeVarExp.SubexpIndex("Key"),
+		valueIndex: setOutcomeVarExp.SubexpIndex("Value"),
+		vars:       []opslevel.RunnerJobOutcomeVariable{},
 	}
 }
 
@@ -36,7 +33,7 @@ func (s *SetOutcomeVarLogProcessor) Process(line string) string {
 	if len(data) > 0 {
 		s.mutex.Lock()
 		defer s.mutex.Unlock()
-		s.vars = append(s.vars, OutcomeVariable{
+		s.vars = append(s.vars, opslevel.RunnerJobOutcomeVariable{
 			Key:   data[s.keyIndex],
 			Value: data[s.valueIndex],
 		})
@@ -45,10 +42,14 @@ func (s *SetOutcomeVarLogProcessor) Process(line string) string {
 	return line
 }
 
-func (s *SetOutcomeVarLogProcessor) Flush() {
+func (s *SetOutcomeVarLogProcessor) PrintVariables() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	for _, v := range s.vars {
 		log.Info().Msgf("Outcome Variable | '%s'='%s'", v.Key, v.Value)
 	}
+}
+
+func (s *SetOutcomeVarLogProcessor) Variables() []opslevel.RunnerJobOutcomeVariable {
+	return s.vars
 }
