@@ -63,9 +63,9 @@ func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 			log.Warn().Msgf("[%d] Job '%s' failed REASON: %s", index, job.Id, outcome.Message)
 		}
 		err = client.ReportJobOutcome(opslevel.RunnerReportJobOutcomeInput{
-			RunnerId:    runnerId,
-			RunnerJobId: job.Id,
-			Outcome:     outcome.Outcome,
+			RunnerId:         runnerId,
+			RunnerJobId:      job.Id,
+			Outcome:          outcome.Outcome,
 			OutcomeVariables: outcomeProcessor.Variables(),
 		})
 		outcomeProcessor.Clear()
@@ -84,10 +84,8 @@ func jobPoller(runnerId string, jobQueue chan<- opslevel.RunnerJob) {
 		log.Trace().Msg("[0] Polling for jobs ...")
 		continue_polling := true
 		for continue_polling {
-			if token != nil {
-				log.Trace().Msgf("[0] Get Pending jobs since '%s' ...", (*token).(string))
-			}
-			job, nextToken, err := client.GetPendingJob(runnerId, *token)
+			log.Debug().Msgf("[0] Get pending jobs with lastUpdateToken '%v' ...", *token)
+			job, nextToken, err := client.GetPendingJob(runnerId, token)
 			if err != nil {
 				log.Error().Err(err).Msg("[0] got error when getting pending job")
 				continue_polling = false
