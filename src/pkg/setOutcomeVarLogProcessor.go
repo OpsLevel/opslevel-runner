@@ -50,6 +50,15 @@ func (s *SetOutcomeVarLogProcessor) PrintVariables() {
 	}
 }
 
+func (s *SetOutcomeVarLogProcessor) Clear() {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.vars = nil
+	s.vars = []opslevel.RunnerJobOutcomeVariable{}
+}
+
 func (s *SetOutcomeVarLogProcessor) Variables() []opslevel.RunnerJobOutcomeVariable {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 	return s.vars
 }

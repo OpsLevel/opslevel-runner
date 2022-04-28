@@ -48,15 +48,16 @@ func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 	client := getClientGQL()
 	runner, err := pkg.NewJobRunner(index)
 	cobra.CheckErr(err)
-
+	outcomeProcessor := pkg.NewSetOutcomeVarLogProcessor()
+	// TODO: If Log Level == Trace - add logging processor similar to `test` command?
+	streamer := pkg.NewLogStreamer(outcomeProcessor)
+	go streamer.Run()
 	log.Info().Msgf("[%d] Starting job worker ...", index)
 	for {
 		job := <-jobQueue
 		log.Info().Msgf("[%d] Starting job '%s'", index, job.Id)
-		outcomeProcessor := pkg.NewSetOutcomeVarLogProcessor()
-		// TODO: If Log Level == Trace - add logging processor similar to `test` command?
-		streamer := pkg.NewLogStreamer(outcomeProcessor)
 		outcome := runner.Run(job, streamer.Stdout, streamer.Stderr)
+		streamer.Flush()
 		log.Info().Msgf("[%d] Finished job '%s' with outcome '%s'", index, job.Id, outcome.Outcome)
 		if outcome.Outcome != opslevel.RunnerJobOutcomeEnumSuccess {
 			log.Warn().Msgf("[%d] Job '%s' failed REASON: %s", index, job.Id, outcome.Message)
@@ -67,6 +68,7 @@ func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 			Outcome:     outcome.Outcome,
 			OutcomeVariables: outcomeProcessor.Variables(),
 		})
+		outcomeProcessor.Clear()
 		if err != nil {
 			log.Error().Err(err).Msgf("[%d] got error when reporting job outcome", index)
 		}
