@@ -25,3 +25,7 @@ jobs:
         run: |-
           cd src/
           go test -race -coverprofile=coverage.txt -covermode=atomic -v ./...
+      - name: Upload Coverage
+        run: |-
+          cd src/
+          bash <(curl -s https://codecov.io/bash)
