@@ -66,9 +66,9 @@ func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 		logger.Info().Msgf("Starting job '%s'", job.Id)
 		outcome := runner.Run(job, streamer.Stdout, streamer.Stderr)
 		streamer.Flush()
-		jobDuration := time.Since(jobStart).Seconds()
-		pkg.MetricJobsDuration.Observe(jobDuration)
-		logger.Debug().Msgf("Finished Job '%s' took '%d' seconds and had outcome '%s'", job.Id, jobDuration, outcome.Outcome)
+		jobDuration := time.Since(jobStart)
+		pkg.MetricJobsDuration.Observe(jobDuration.Seconds())
+		logger.Debug().Msgf("Finished Job '%s' took '%s' and had outcome '%s'", job.Id, jobDuration, outcome.Outcome)
 		pkg.MetricJobsFinished.WithLabelValues(string(outcome.Outcome)).Inc()
 		if outcome.Outcome != opslevel.RunnerJobOutcomeEnumSuccess {
 			logger.Warn().Msgf("Job '%s' failed REASON: %s", job.Id, outcome.Message)
