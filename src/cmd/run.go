@@ -20,7 +20,7 @@ var runCmd = &cobra.Command{
 func init() {
 	runCmd.Flags().Int("job-concurrency", 3, "The number jobs this runner will handle in parallel.")
 	runCmd.Flags().Int("poll-interval", 10, "The amount of time in seconds between API calls to find pending jobs.")
-	runCmd.Flags().Int("metrics-port", 10354, "The port on which to bind the prometheus metrics endpoint to.")
+	runCmd.Flags().Int("metrics-port", 10354, "The port on which to bind the metrics endpoint to.")
 	viper.BindPFlags(runCmd.Flags())
 
 	rootCmd.AddCommand(runCmd)
@@ -30,12 +30,13 @@ func doRun(cmd *cobra.Command, args []string) {
 	logVersion()
 
 	runnerId := args[0]
+	log.Info().Msgf("Starting runner for id '%s'", runnerId)
 	jobQueue := make(chan opslevel.RunnerJob)
 
 	// Validate we can create a graphql client
 	getClientGQL()
 
-	pkg.StartMetricsServer(viper.GetInt("metrics-port"))
+	pkg.StartMetricsServer(runnerId, viper.GetInt("metrics-port"))
 
 	concurrency := viper.GetInt("job-concurrency")
 	if concurrency < 1 {
@@ -68,7 +69,7 @@ func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 		streamer.Flush()
 		jobDuration := time.Since(jobStart)
 		pkg.MetricJobsDuration.Observe(jobDuration.Seconds())
-		logger.Debug().Msgf("Finished Job '%s' took '%s' and had outcome '%s'", job.Id, jobDuration, outcome.Outcome)
+		logger.Info().Msgf("Finished Job '%s' took '%s' and had outcome '%s'", job.Id, jobDuration, outcome.Outcome)
 		pkg.MetricJobsFinished.WithLabelValues(string(outcome.Outcome)).Inc()
 		if outcome.Outcome != opslevel.RunnerJobOutcomeEnumSuccess {
 			logger.Warn().Msgf("Job '%s' failed REASON: %s", job.Id, outcome.Message)

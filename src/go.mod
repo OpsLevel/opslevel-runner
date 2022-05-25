@@ -3,7 +3,6 @@ module github.com/opslevel/opslevel-runner
 go 1.17
 
 require (
-	github.com/google/uuid v1.3.0
 	github.com/opslevel/opslevel-go v0.4.5-0.20220225194148-bc75f2c38d93
 	github.com/prometheus/client_golang v1.12.2
 	github.com/rocktavious/autopilot v0.1.5
