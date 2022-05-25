@@ -53,10 +53,11 @@ func initMetrics() {
 func StartMetricsServer(port int) {
 	initMetrics()
 	go func() {
-		http.Handle("/metrics", promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{})) // Uses a clean instrumentation free handler
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{})) // Uses a clean instrumentation free handler
 		prometheus.Unregister(collectors.NewGoCollector())                                               // Unregisters the go metrics
 		prometheusAddress := fmt.Sprintf(":%d", port)
 		log.Info().Msgf("Starting promethus metrics service on '%s/metrics'", prometheusAddress)
-		http.ListenAndServe(prometheusAddress, nil)
+		http.ListenAndServe(prometheusAddress, mux)
 	}()
 }
