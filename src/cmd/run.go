@@ -20,6 +20,7 @@ var runCmd = &cobra.Command{
 func init() {
 	runCmd.Flags().Int("job-concurrency", 3, "The number jobs this runner will handle in parallel.")
 	runCmd.Flags().Int("poll-interval", 10, "The amount of time in seconds between API calls to find pending jobs.")
+	runCmd.Flags().Int("metrics-port", 10354, "The port on which to bind the metrics endpoint to.")
 	viper.BindPFlags(runCmd.Flags())
 
 	rootCmd.AddCommand(runCmd)
@@ -29,9 +30,13 @@ func doRun(cmd *cobra.Command, args []string) {
 	logVersion()
 
 	runnerId := args[0]
+	log.Info().Msgf("Starting runner for id '%s'", runnerId)
 	jobQueue := make(chan opslevel.RunnerJob)
+
 	// Validate we can create a graphql client
 	getClientGQL()
+
+	pkg.StartMetricsServer(runnerId, viper.GetInt("metrics-port"))
 
 	concurrency := viper.GetInt("job-concurrency")
 	if concurrency < 1 {
@@ -56,10 +61,16 @@ func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 	logger.Info().Msg("Starting job processor ...")
 	for {
 		job := <-jobQueue
+		jobStart := time.Now()
+		pkg.MetricJobsStarted.Inc()
+		pkg.MetricJobsProcessing.Inc()
 		logger.Info().Msgf("Starting job '%s'", job.Id)
 		outcome := runner.Run(job, streamer.Stdout, streamer.Stderr)
 		streamer.Flush()
-		logger.Info().Msgf("Finished job '%s' with outcome '%s'", job.Id, outcome.Outcome)
+		jobDuration := time.Since(jobStart)
+		pkg.MetricJobsDuration.Observe(jobDuration.Seconds())
+		logger.Info().Msgf("Finished Job '%s' took '%s' and had outcome '%s'", job.Id, jobDuration, outcome.Outcome)
+		pkg.MetricJobsFinished.WithLabelValues(string(outcome.Outcome)).Inc()
 		if outcome.Outcome != opslevel.RunnerJobOutcomeEnumSuccess {
 			logger.Warn().Msgf("Job '%s' failed REASON: %s", job.Id, outcome.Message)
 		}
@@ -69,10 +80,11 @@ func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 			Outcome:          outcome.Outcome,
 			OutcomeVariables: outcomeProcessor.Variables(),
 		})
-		outcomeProcessor.Clear()
 		if err != nil {
 			logger.Error().Err(err).Msg("got error when reporting job outcome")
 		}
+		outcomeProcessor.Clear()
+		pkg.MetricJobsProcessing.Dec()
 	}
 }
 
