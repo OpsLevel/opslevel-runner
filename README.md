@@ -18,11 +18,48 @@
 # opslevel-runner
 OpsLevel Runner is the Kubernetes based job processor for [OpsLevel](https://www.opslevel.com/)
 
+### Metrics
 
-### Testing Commands
+| Name | Type | Description |
+| --- | --- | --- |
+| opslevel_runner_jobs_duration | `histogram` | The duration of jobs in seconds. |
+| opslevel_runner_jobs_finished | `counter` | The count of jobs that finished processing by outcome status. |
+| opslevel_runner_jobs_processing | `gauge` | The current number of active jobs being processed. |
+| opslevel_runner_jobs_started | `counter` | The count of jobs that started processing. |
 
+
+### Commands
+
+Testing a job
+
+```sh
+OPSLEVEL_API_TOKEN=XXXXX go run main.go test -f job.yaml
+
+cat << EOF | OPSLEVEL_API_TOKEN=XXXXX go run main.go test -f -
+id: "1"
+image: alpine/curl
+commands:
+  - export TEST=100
+  - echo "::set-outcome-var hello-world=42"
+  - sleep 2
+  - echo $TEST
+  - echo $Secret
+  - echo $NotSecret
+variables:
+  - key: Secret
+    value: "World!"
+    sensitive: true
+  - key: NotSecret
+    value: "World!"
+    sensitive: false
+EOF
 ```
-go run main.go run "while :; do echo 'Heartbeat'; sleep 1; done"
 
-go run main.go run "for i in 1 2 3 4 5 6 7 8 9 10; do echo \"Hearthbeat \$i\"; sleep 1; done"
+Running
+
+```sh
+# Production
+OPSLEVEL_API_TOKEN=XXXXX go run main.go run ZZZZZ 
+# Staging
+OPSLEVEL_API_TOKEN=XXXXX go run main.go run ZZZZZ --api-url=https://api.opslevel-staging.com/graphql --app-url=https://app.opslevel-staging.com  
 ```
