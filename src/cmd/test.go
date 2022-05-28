@@ -2,13 +2,13 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-
 	"github.com/opslevel/opslevel-go"
 	"github.com/opslevel/opslevel-runner/pkg"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"os"
+	"time"
 )
 
 var jobFile string
@@ -35,18 +35,18 @@ func doTest(cmd *cobra.Command, args []string) error {
 		job.Id = "1"
 	}
 	streamer := pkg.NewLogStreamer(
-		pkg.NewSetOutcomeVarLogProcessor(),
+		log.Logger,
+		pkg.NewSetOutcomeVarLogProcessor(nil, log.Logger, "1", "1"),
 		pkg.NewSanitizeLogProcessor(job.Variables),
-		pkg.NewPrefixLogProcessor(fmt.Sprintf("[%d] ", 0)),
-		pkg.NewLoggerLogProcessor(log.Logger))
+		pkg.NewLoggerLogProcessor(log.Logger),
+		pkg.NewOpsLevelAppendLogProcessor(nil, log.Logger, "1", "1", 1024000, 30 * time.Second),
+		)
 	runner, err := pkg.NewJobRunner(log.Logger, viper.GetString("pod-namespace"))
 	cobra.CheckErr(err)
 
 	go streamer.Run()
-
 	outcome := runner.Run(*job, streamer.Stdout, streamer.Stderr)
-
-	streamer.Flush()
+	streamer.Flush(outcome)
 
 	if outcome.Outcome != opslevel.RunnerJobOutcomeEnumSuccess {
 		return fmt.Errorf(outcome.Message)

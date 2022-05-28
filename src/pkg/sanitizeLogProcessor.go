@@ -29,3 +29,5 @@ func (s *SanitizeLogProcessor) Process(line string) string {
 	}
 	return scrubbed
 }
+
+func (s *SanitizeLogProcessor) Flush(outcome JobOutcome) {}

@@ -2,25 +2,29 @@ package pkg
 
 import (
 	"github.com/opslevel/opslevel-go"
+	"github.com/rs/zerolog"
 	"regexp"
-	"sync"
-
-	"github.com/rs/zerolog/log"
 )
 
 var setOutcomeVarExp = regexp.MustCompile(`^::set-outcome-var\s(?P<Key>[\w-]+)=(?P<Value>.*)`)
 
 type SetOutcomeVarLogProcessor struct {
-	mutex      sync.Mutex
+	client     *opslevel.Client
+	logger     zerolog.Logger
+	runnerId   string
+	jobId      string
 	regex      *regexp.Regexp
 	keyIndex   int
 	valueIndex int
 	vars       []opslevel.RunnerJobOutcomeVariable
 }
 
-func NewSetOutcomeVarLogProcessor() *SetOutcomeVarLogProcessor {
+func NewSetOutcomeVarLogProcessor(client *opslevel.Client, logger zerolog.Logger, runnerId string, jobId string) *SetOutcomeVarLogProcessor {
 	return &SetOutcomeVarLogProcessor{
-		mutex:      sync.Mutex{},
+		client:     client,
+		logger:     logger,
+		runnerId:   runnerId,
+		jobId:      jobId,
 		regex:      setOutcomeVarExp,
 		keyIndex:   setOutcomeVarExp.SubexpIndex("Key"),
 		valueIndex: setOutcomeVarExp.SubexpIndex("Value"),
@@ -31,8 +35,6 @@ func NewSetOutcomeVarLogProcessor() *SetOutcomeVarLogProcessor {
 func (s *SetOutcomeVarLogProcessor) Process(line string) string {
 	data := s.regex.FindStringSubmatch(line)
 	if len(data) > 0 {
-		s.mutex.Lock()
-		defer s.mutex.Unlock()
 		s.vars = append(s.vars, opslevel.RunnerJobOutcomeVariable{
 			Key:   data[s.keyIndex],
 			Value: data[s.valueIndex],
@@ -42,23 +44,24 @@ func (s *SetOutcomeVarLogProcessor) Process(line string) string {
 	return line
 }
 
-func (s *SetOutcomeVarLogProcessor) PrintVariables() {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+func (s *SetOutcomeVarLogProcessor) Flush(outcome JobOutcome) {
 	for _, v := range s.vars {
-		log.Info().Msgf("Outcome Variable | '%s'='%s'", v.Key, v.Value)
+		s.logger.Debug().Msgf("Outcome Variable | '%s'='%s'", v.Key, v.Value)
 	}
-}
 
-func (s *SetOutcomeVarLogProcessor) Clear() {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	s.vars = nil
-	s.vars = []opslevel.RunnerJobOutcomeVariable{}
-}
-
-func (s *SetOutcomeVarLogProcessor) Variables() []opslevel.RunnerJobOutcomeVariable {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	return s.vars
+	if outcome.Outcome != opslevel.RunnerJobOutcomeEnumSuccess {
+		s.logger.Warn().Msgf("Job '%s' failed REASON: %s", s.jobId, outcome.Message)
+	}
+	if s.client == nil {
+		return
+	}
+	err := s.client.RunnerReportJobOutcome(opslevel.RunnerReportJobOutcomeInput{
+		RunnerId:         s.runnerId,
+		RunnerJobId:      s.jobId,
+		Outcome:          outcome.Outcome,
+		OutcomeVariables: s.vars,
+	})
+	if err != nil {
+		s.logger.Error().Err(err).Msgf("error when reporting outcome '%s' for job '%s'", outcome.Outcome, s.jobId)
+	}
 }

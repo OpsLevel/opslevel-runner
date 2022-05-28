@@ -5,18 +5,17 @@ import (
 )
 
 type PrefixLogProcessor struct {
-	prefix string
+	prefix func() string
 }
 
-func NewPrefixLogProcessor(prefix string) *PrefixLogProcessor {
+func NewPrefixLogProcessor(prefix func() string) *PrefixLogProcessor {
 	return &PrefixLogProcessor{
 		prefix: prefix,
 	}
 }
 
 func (s *PrefixLogProcessor) Process(line string) string {
-	if len(line) > 0 {
-		return fmt.Sprintf("%s%s", s.prefix, line)
-	}
-	return line
+	return fmt.Sprintf("%s%s", s.prefix(), line)
 }
+
+func (s *PrefixLogProcessor) Flush(outcome JobOutcome) {}

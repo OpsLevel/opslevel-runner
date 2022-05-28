@@ -20,3 +20,5 @@ func (s *LoggerLogProcessor) Process(line string) string {
 	}
 	return line
 }
+
+func (s *LoggerLogProcessor) Flush(outcome JobOutcome) {}
