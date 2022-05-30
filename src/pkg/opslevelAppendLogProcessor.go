@@ -1,6 +1,7 @@
 package pkg
 
 import (
+	"encoding/base64"
 	"github.com/opslevel/opslevel-go"
 	"github.com/rs/zerolog"
 	"time"
@@ -36,7 +37,8 @@ func NewOpsLevelAppendLogProcessor(client *opslevel.Client, logger zerolog.Logge
 }
 
 func (s *OpsLevelAppendLogProcessor) Process(line string) string {
-	lineBytesSize := len(line)
+	lineInBytes := []byte(line)
+	lineBytesSize := len(lineInBytes)
 
 	if s.logLinesBytesSize+lineBytesSize > s.maxBytes {
 		s.logger.Trace().Msg("Shipping logs because of maxBytes ...")
@@ -44,7 +46,7 @@ func (s *OpsLevelAppendLogProcessor) Process(line string) string {
 	}
 
 	s.logLinesBytesSize += lineBytesSize
-	s.logLines = append(s.logLines, line)
+	s.logLines = append(s.logLines, base64.StdEncoding.EncodeToString(lineInBytes))
 	if s.firstLine == false {
 		s.logger.Trace().Msg("Shipping logs because its the first line ...")
 		s.firstLine = true
