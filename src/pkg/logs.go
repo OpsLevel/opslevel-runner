@@ -72,7 +72,7 @@ func (s *LogStreamer) Flush(outcome JobOutcome) {
 	s.quit <- true
 	time.Sleep(200 * time.Millisecond) // Allow 'Run' goroutine to quit
 	s.logger.Trace().Msg("Flushing log processors ...")
-	for _, processor := range s.processors {
-		processor.Flush(outcome)
+	for i := len(s.processors)-1; i >= 0; i-- {
+		s.processors[i].Flush(outcome)
 	}
 }
