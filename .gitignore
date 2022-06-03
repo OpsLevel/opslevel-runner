@@ -13,3 +13,9 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+
+# Mac specific cruft
+.DS_Store
+
+# Default go build output
+src/opslevel-runner

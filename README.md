@@ -63,3 +63,43 @@ OPSLEVEL_API_TOKEN=XXXXX go run main.go run ZZZZZ
 # Staging
 OPSLEVEL_API_TOKEN=XXXXX go run main.go run ZZZZZ --api-url=https://api.opslevel-staging.com/graphql --app-url=https://app.opslevel-staging.com  
 ```
+
+## Running
+
+Download the latest release from the [Releases](https://github.com/OpsLevel/opslevel-runner/releases/) page for your architecture.
+
+Extract it to a directory of your choice, mark it as executable and move it to something on your path
+
+```
+chmod +x ./opslevel-runner
+mv ./opslevel-runner /usr/local/bin/opslevel-runner
+```
+
+For OSX you'll probably need to remove the quarantine bit:
+
+```
+sudo xattr -r -d com.apple.quarantine /usr/local/bin/opslevel-runner
+```
+
+At this point you can run the OpsLevel Runner with OpsLevel by following the [instructions](https://gitlab.com/jklabsinc/OpsLevel/-/blob/master/CONTRIBUTING.md#OpsLevel-Runner) in that repository.
+
+## Developing
+
+To build, ensure you have go installed
+
+```
+brew install go
+```
+
+Then init and update the submodules (if you clone with `--recurse-submodules` you can skip this step)
+
+```
+git submodule init && git submodule update
+```
+
+Then run `go build` in `src` to build in the local directory, you can also use `-o <PATH>` to put the file in a target location of your choice.
+
+```
+cd src
+go build
+```
