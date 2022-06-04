@@ -1,8 +1,13 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 	"time"
+	"context"
 
 	"github.com/opslevel/opslevel-go"
 	"github.com/opslevel/opslevel-runner/pkg"
@@ -36,9 +41,6 @@ func doRun(cmd *cobra.Command, args []string) {
 	log.Info().Msgf("Starting runner for id '%s'", runnerId)
 	jobQueue := make(chan opslevel.RunnerJob)
 
-	// Validate we can create a graphql client
-	getClientGQL()
-
 	pkg.StartMetricsServer(runnerId, viper.GetInt("metrics-port"))
 
 	concurrency := viper.GetInt("job-concurrency")
@@ -55,15 +57,17 @@ func doRun(cmd *cobra.Command, args []string) {
 func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 	logMaxBytes := viper.GetInt("log-max-bytes")
 	logMaxDuration := time.Duration(viper.GetInt("log-max-time")) * time.Second
-	logPrefix := func() string { return fmt.Sprintf("%s [%d] ", time.Now().UTC().Format(time.RFC3339), index)}
+	logPrefix := func() string { return fmt.Sprintf("%s [%d] ", time.Now().UTC().Format(time.RFC3339), index) }
 	logger := log.With().Int("worker", index).Logger()
-	client := getClientGQL()
+	client := pkg.GetGQLClient()
+	tracer := pkg.GetTracer()
 	runner, err := pkg.NewJobRunner(logger, viper.GetString("pod-namespace"))
 	cobra.CheckErr(err)
 
 	logger.Info().Msg("Starting job processor ...")
 	for {
 		job := <-jobQueue
+		ctx := context.Background()
 
 		// TODO: If Log Level == Trace - add logging processor similar to `test` command?
 		streamer := pkg.NewLogStreamer(
@@ -72,7 +76,7 @@ func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 			pkg.NewSanitizeLogProcessor(job.Variables),
 			pkg.NewPrefixLogProcessor(logPrefix),
 			pkg.NewOpsLevelAppendLogProcessor(client, logger, runnerId, job.Id.(string), logMaxBytes, logMaxDuration),
-			)
+		)
 
 		jobStart := time.Now()
 		pkg.MetricJobsStarted.Inc()
@@ -80,20 +84,33 @@ func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 		logger.Info().Msgf("Starting job '%s'", job.Id)
 
 		go streamer.Run()
+		ctx, spanStart := tracer.Start(ctx, "start-job", trace.WithSpanKind(trace.SpanKindConsumer), trace.WithAttributes(attribute.String("job-id", job.Id.(string))))
 		outcome := runner.Run(job, streamer.Stdout, streamer.Stderr)
+		ctx, spanFinish := tracer.Start(ctx, "finish-job", trace.WithSpanKind(trace.SpanKindConsumer), trace.WithAttributes(attribute.String("job-id", job.Id.(string)))
 		streamer.Flush(outcome)
+		spanFinish.SetAttributes(
+			attribute.String("outcome", string(outcome.Outcome)),
+		)
+		if outcome.Outcome != opslevel.RunnerJobOutcomeEnumSuccess {
+			err := errors.New(outcome.Message)
+			spanFinish.RecordError(err)
+			spanFinish.SetStatus(codes.Error, err.Error())
+		}
+		spanFinish.End()
+		spanStart.End()
 
 		jobDuration := time.Since(jobStart)
 		pkg.MetricJobsDuration.Observe(jobDuration.Seconds())
 		logger.Info().Msgf("Finished Job '%s' took '%s' and had outcome '%s'", job.Id, jobDuration, outcome.Outcome)
 		pkg.MetricJobsFinished.WithLabelValues(string(outcome.Outcome)).Inc()
 		pkg.MetricJobsProcessing.Dec()
+
 	}
 }
 
 func jobPoller(runnerId string, jobQueue chan<- opslevel.RunnerJob) {
 	logger := log.With().Int("worker", 0).Logger()
-	client := getClientGQL()
+	client := pkg.GetGQLClient()
 	token := opslevel.NewID("")
 	poll_wait_time := time.Second * time.Duration(viper.GetInt("poll-interval"))
 	logger.Info().Msg("Starting polling for jobs")

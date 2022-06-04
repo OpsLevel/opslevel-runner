@@ -1,11 +1,11 @@
 package cmd
 
 import (
+	"fmt"
+	"github.com/opslevel/opslevel-runner/pkg"
 	"os"
 	"strings"
 
-	"github.com/opslevel/opslevel-go"
-	"github.com/opslevel/opslevel-runner/pkg"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -59,6 +59,7 @@ func init() {
 func initConfig() {
 	readConfig()
 	setupLogging()
+	setupGQLClient()
 }
 
 func readConfig() {
@@ -109,11 +110,11 @@ func setupLogging() {
 	}
 }
 
-var _clientGQL *opslevel.Client
-
-func getClientGQL() *opslevel.Client {
-	if _clientGQL == nil {
-		_clientGQL = pkg.NewGraphClient(version)
-	}
-	return _clientGQL
+func setupGQLClient() {
+	pkg.SetupGQLClient(
+		viper.GetString("api-token"),
+		viper.GetString("api-url"),
+		fmt.Sprintf("opslevel-runner-%s", version),
+		"internal",
+	)
 }
