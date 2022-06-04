@@ -84,7 +84,10 @@ func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 		logger.Info().Msgf("Starting job '%s'", job.Id)
 
 		go streamer.Run()
-		ctx, spanStart := tracer.Start(ctx, "start-job", trace.WithSpanKind(trace.SpanKindConsumer), trace.WithAttributes(attribute.String("job-id", job.Id.(string))))
+		ctx, spanStart := tracer.Start(ctx, "start-job", 
+		  trace.WithSpanKind(trace.SpanKindConsumer),
+		  trace.WithAttributes(attribute.String("job-id", job.Id.(string)))
+		)
 		outcome := runner.Run(job, streamer.Stdout, streamer.Stderr)
 		ctx, spanFinish := tracer.Start(ctx, "finish-job", trace.WithSpanKind(trace.SpanKindConsumer), trace.WithAttributes(attribute.String("job-id", job.Id.(string)))
 		streamer.Flush(outcome)
