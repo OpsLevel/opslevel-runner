@@ -14,9 +14,8 @@ import (
 
 // previewCmd represents the preview command
 var runCmd = &cobra.Command{
-	Use:  "run [RUNNER ID]",
-	Args: cobra.ExactArgs(1),
-	Run:  doRun,
+	Use: "run",
+	Run: doRun,
 }
 
 func init() {
@@ -33,27 +32,34 @@ func init() {
 func doRun(cmd *cobra.Command, args []string) {
 	logVersion()
 
-	runnerId := args[0]
-	log.Info().Msgf("Starting runner for id '%s'", runnerId)
-	//jobQueue := make(chan opslevel.RunnerJob)
+	client := getClientGQL()
 
-	// Validate we can create a graphql client
-	//getClientGQL()
+	runner, err := client.RunnerRegister()
+	cobra.CheckErr(err)
 
-	pkg.StartMetricsServer(runnerId, viper.GetInt("metrics-port"))
+	log.Info().Msgf("Starting runner for id '%s'", runner.Id)
+	pkg.StartMetricsServer(runner.Id.(string), viper.GetInt("metrics-port"))
+	startWorkers(runner.Id.(string))
+	<-opslevel_common.InitSignalHandler() // Enter Forever Loop
+	log.Info().Msgf("Unregister runner for id '%s'...", runner.Id)
+	client.RunnerUnregister(&runner.Id)
+}
 
+func startWorkers(runnerId string) {
+	concurrency := getConcurrency()
+	jobQueue := make(chan opslevel.RunnerJob)
+	for w := 1; w <= concurrency; w++ {
+		go jobWorker(w, runnerId, jobQueue)
+	}
+	go jobPoller(runnerId, jobQueue)
+}
+
+func getConcurrency() int {
 	concurrency := viper.GetInt("job-concurrency")
 	if concurrency < 1 {
 		concurrency = 1
 	}
-	//for w := 1; w <= concurrency; w++ {
-	//	go jobWorker(w, runnerId, jobQueue)
-	//}
-	//go jobPoller(runnerId, jobQueue)
-
-	log.Info().Msg("Starting...")
-	<-opslevel_common.InitSignalHandler() // Enter Forever Loop
-	log.Info().Msg("Stopping...")
+	return concurrency
 }
 
 func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
