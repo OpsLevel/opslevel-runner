@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	opslevel_common "github.com/opslevel/opslevel-common/v2022"
 	"time"
 
 	"github.com/opslevel/opslevel-go"
@@ -34,10 +35,10 @@ func doRun(cmd *cobra.Command, args []string) {
 
 	runnerId := args[0]
 	log.Info().Msgf("Starting runner for id '%s'", runnerId)
-	jobQueue := make(chan opslevel.RunnerJob)
+	//jobQueue := make(chan opslevel.RunnerJob)
 
 	// Validate we can create a graphql client
-	getClientGQL()
+	//getClientGQL()
 
 	pkg.StartMetricsServer(runnerId, viper.GetInt("metrics-port"))
 
@@ -45,17 +46,20 @@ func doRun(cmd *cobra.Command, args []string) {
 	if concurrency < 1 {
 		concurrency = 1
 	}
-	for w := 1; w <= concurrency; w++ {
-		go jobWorker(w, runnerId, jobQueue)
-	}
-	// Enter Forever loop
-	jobPoller(runnerId, jobQueue)
+	//for w := 1; w <= concurrency; w++ {
+	//	go jobWorker(w, runnerId, jobQueue)
+	//}
+	//go jobPoller(runnerId, jobQueue)
+
+	log.Info().Msg("Starting...")
+	<-opslevel_common.InitSignalHandler() // Enter Forever Loop
+	log.Info().Msg("Stopping...")
 }
 
 func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 	logMaxBytes := viper.GetInt("log-max-bytes")
 	logMaxDuration := time.Duration(viper.GetInt("log-max-time")) * time.Second
-	logPrefix := func() string { return fmt.Sprintf("%s [%d] ", time.Now().UTC().Format(time.RFC3339), index)}
+	logPrefix := func() string { return fmt.Sprintf("%s [%d] ", time.Now().UTC().Format(time.RFC3339), index) }
 	logger := log.With().Int("worker", index).Logger()
 	client := getClientGQL()
 	runner, err := pkg.NewJobRunner(logger, viper.GetString("pod-namespace"))
@@ -72,7 +76,7 @@ func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 			pkg.NewSanitizeLogProcessor(job.Variables),
 			pkg.NewPrefixLogProcessor(logPrefix),
 			pkg.NewOpsLevelAppendLogProcessor(client, logger, runnerId, job.Id.(string), logMaxBytes, logMaxDuration),
-			)
+		)
 
 		jobStart := time.Now()
 		pkg.MetricJobsStarted.Inc()
