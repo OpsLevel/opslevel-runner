@@ -59,9 +59,9 @@ Running
 
 ```sh
 # Production
-OPSLEVEL_API_TOKEN=XXXXX go run main.go run ZZZZZ 
+OPSLEVEL_API_TOKEN=XXXXX go run main.go run 
 # Staging
-OPSLEVEL_API_TOKEN=XXXXX go run main.go run ZZZZZ --api-url=https://api.opslevel-staging.com/graphql --app-url=https://app.opslevel-staging.com  
+OPSLEVEL_API_TOKEN=XXXXX go run main.go run --api-url=https://api.opslevel-staging.com/graphql --app-url=https://app.opslevel-staging.com  
 ```
 
 ## Running
