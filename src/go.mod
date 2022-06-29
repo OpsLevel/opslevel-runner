@@ -1,6 +1,6 @@
 module github.com/opslevel/opslevel-runner
 
-go 1.17
+go 1.18
 
 require (
 	github.com/opslevel/opslevel-common/v2022 v2022.6.28
