@@ -9,8 +9,3 @@ service:
   language: Go
   framework: Cobra
   description: "`opslevel-runner` is the Kubernetes based job processor for [OpsLevel](https://www.opslevel.com/)"
-  tools:
-  - name: Github Actions
-    category: continuous_integration
-    url: https://github.com/OpsLevel/opslevel-runner/actions
-    environment: Production
