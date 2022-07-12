@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/getsentry/sentry-go"
 	opslevel_common "github.com/opslevel/opslevel-common/v2022"
 	"time"
 
@@ -30,12 +31,13 @@ func init() {
 }
 
 func doRun(cmd *cobra.Command, args []string) {
+	defer sentry.Flush(2 * time.Second)
 	logVersion()
 
 	client := getClientGQL()
 
 	runner, err := client.RunnerRegister()
-	cobra.CheckErr(err)
+	pkg.CheckErr(err)
 
 	log.Info().Msgf("Starting runner for id '%s'", runner.Id)
 	pkg.StartMetricsServer(runner.Id.(string), viper.GetInt("metrics-port"))
@@ -69,7 +71,7 @@ func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 	logger := log.With().Int("worker", index).Logger()
 	client := getClientGQL()
 	runner, err := pkg.NewJobRunner(logger, viper.GetString("pod-namespace"))
-	cobra.CheckErr(err)
+	pkg.CheckErr(err)
 
 	logger.Info().Msg("Starting job processor ...")
 	for {

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/getsentry/sentry-go"
 	"os"
 	"strings"
 
@@ -59,6 +60,9 @@ func init() {
 func initConfig() {
 	readConfig()
 	setupLogging()
+	if value, present := os.LookupEnv("SENTRY_DSN"); present {
+		setupSentry(value)
+	}
 }
 
 func readConfig() {
@@ -106,6 +110,20 @@ func setupLogging() {
 		zerolog.SetGlobalLevel(zerolog.TraceLevel)
 	default:
 		zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	}
+}
+
+func setupSentry(dsn string) {
+	err := sentry.Init(sentry.ClientOptions{
+		Dsn: dsn,
+
+		// Set TracesSampleRate to 1.0 to capture 100%
+		// of transactions for performance monitoring.
+		// We recommend adjusting this value in production,
+		TracesSampleRate: 1.0,
+	})
+	if err != nil {
+		log.Error().Msgf("sentry.Init: %s", err)
 	}
 }
 
