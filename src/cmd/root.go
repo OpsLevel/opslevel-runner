@@ -2,10 +2,10 @@ package cmd
 
 import (
 	"github.com/getsentry/sentry-go"
+	"github.com/opslevel/opslevel-go/v2022"
 	"os"
 	"strings"
 
-	"github.com/opslevel/opslevel-go"
 	"github.com/opslevel/opslevel-runner/pkg"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"

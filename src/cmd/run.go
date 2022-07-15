@@ -1,12 +1,17 @@
 package cmd
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"github.com/getsentry/sentry-go"
 	opslevel_common "github.com/opslevel/opslevel-common/v2022"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 	"time"
 
-	"github.com/opslevel/opslevel-go"
+	"github.com/opslevel/opslevel-go/v2022"
 	"github.com/opslevel/opslevel-runner/pkg"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -70,12 +75,14 @@ func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 	logPrefix := func() string { return fmt.Sprintf("%s [%d] ", time.Now().UTC().Format(time.RFC3339), index) }
 	logger := log.With().Int("worker", index).Logger()
 	client := getClientGQL()
+	tracer := pkg.GetTracer()
 	runner, err := pkg.NewJobRunner(logger, viper.GetString("pod-namespace"))
 	pkg.CheckErr(err)
 
 	logger.Info().Msg("Starting job processor ...")
 	for {
 		job := <-jobQueue
+		ctx := context.Background()
 
 		// TODO: If Log Level == Trace - add logging processor similar to `test` command?
 		streamer := pkg.NewLogStreamer(
@@ -92,8 +99,26 @@ func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 		logger.Info().Msgf("Starting job '%s'", job.Id)
 
 		go streamer.Run()
+		ctx, spanStart := tracer.Start(ctx, "start-job",
+			trace.WithSpanKind(trace.SpanKindConsumer),
+			trace.WithAttributes(attribute.String("job-id", job.Id.(string))),
+		)
 		outcome := runner.Run(job, streamer.Stdout, streamer.Stderr)
+		ctx, spanFinish := tracer.Start(ctx,
+			"finish-job",
+			trace.WithSpanKind(trace.SpanKindConsumer),
+			trace.WithAttributes(attribute.String("job-id", job.Id.(string))))
 		streamer.Flush(outcome)
+		spanFinish.SetAttributes(
+			attribute.String("outcome", string(outcome.Outcome)),
+		)
+		if outcome.Outcome != opslevel.RunnerJobOutcomeEnumSuccess {
+			err := errors.New(outcome.Message)
+			spanFinish.RecordError(err)
+			spanFinish.SetStatus(codes.Error, err.Error())
+		}
+		spanFinish.End()
+		spanStart.End()
 
 		jobDuration := time.Since(jobStart)
 		pkg.MetricJobsDuration.Observe(jobDuration.Seconds())

@@ -1,9 +1,9 @@
 package pkg
 
 import (
-	"testing"
-	"github.com/opslevel/opslevel-go"
+	"github.com/opslevel/opslevel-go/v2022"
 	"github.com/rocktavious/autopilot"
+	"testing"
 )
 
 func TestSanitizeLogProcessor(t *testing.T) {

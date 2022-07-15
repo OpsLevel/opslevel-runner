@@ -16,7 +16,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/remotecommand"
 
-	"github.com/opslevel/opslevel-go"
+	"github.com/opslevel/opslevel-go/v2022"
 	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
 )
@@ -39,8 +39,8 @@ type JobRunner struct {
 }
 
 type JobOutcome struct {
-	Message string
-	Outcome opslevel.RunnerJobOutcomeEnum
+	Message          string
+	Outcome          opslevel.RunnerJobOutcomeEnum
 	OutcomeVariables []opslevel.RunnerJobOutcomeVariable
 }
 
@@ -54,7 +54,7 @@ func NewJobRunner(logger zerolog.Logger, namespace string) (*JobRunner, error) {
 		return nil, err
 	}
 	return &JobRunner{
-		logger:     logger,
+		logger:    logger,
 		namespace: namespace,
 		config:    config,
 		clientset: clientset,

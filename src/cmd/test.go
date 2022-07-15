@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/opslevel/opslevel-go"
+	"github.com/opslevel/opslevel-go/v2022"
 	"github.com/opslevel/opslevel-runner/pkg"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -39,8 +39,8 @@ func doTest(cmd *cobra.Command, args []string) error {
 		pkg.NewSetOutcomeVarLogProcessor(nil, log.Logger, "1", "1"),
 		pkg.NewSanitizeLogProcessor(job.Variables),
 		pkg.NewLoggerLogProcessor(log.Logger),
-		pkg.NewOpsLevelAppendLogProcessor(nil, log.Logger, "1", "1", 1024000, 30 * time.Second),
-		)
+		pkg.NewOpsLevelAppendLogProcessor(nil, log.Logger, "1", "1", 1024000, 30*time.Second),
+	)
 	runner, err := pkg.NewJobRunner(log.Logger, viper.GetString("pod-namespace"))
 	cobra.CheckErr(err)
 
