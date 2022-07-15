@@ -10,7 +10,15 @@ import (
 )
 
 func NewGraphClient(version string) *opslevel.Client {
-	client := opslevel.NewClient(viper.GetString("api-token"), opslevel.SetURL(viper.GetString("api-url")), opslevel.SetUserAgentExtra(fmt.Sprintf("opslevel-runner-%s", version)), opslevel.SetAPIVisibility("internal"))
+	apiToken := viper.GetString("api-token")
+	apiURL := viper.GetString("api-url")
+	userAgent := fmt.Sprintf("opslevel-runner-%s", version)
+	client := opslevel.NewGQLClient(
+		opslevel.SetAPIToken(apiToken),
+		opslevel.SetURL(apiURL),
+		opslevel.SetUserAgentExtra(userAgent),
+		opslevel.SetAPIVisibility("internal"),
+	)
 
 	clientErr := client.Validate()
 	if clientErr != nil {
