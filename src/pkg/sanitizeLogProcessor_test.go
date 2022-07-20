@@ -21,3 +21,14 @@ func TestSanitizeLogProcessor(t *testing.T) {
 	autopilot.Equals(t, "Hello Everyone", line2)
 	autopilot.Equals(t, "Hello **********", line3)
 }
+
+func TestSanitizeLogProcessorWhereValueIsEmptyString(t *testing.T) {
+	// Arrange
+	p := NewSanitizeLogProcessor([]opslevel.RunnerJobVariable{
+		{Key: "Secret", Value: "", Sensitive: true},
+	})
+	// Act
+	line := p.Process("Hello Everyone")
+	// Assert
+	autopilot.Equals(t, "Hello Everyone", line)
+}

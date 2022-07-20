@@ -14,6 +14,9 @@ func NewSanitizeLogProcessor(variables []opslevel.RunnerJobVariable) *SanitizeLo
 	var secrets []opslevel.RunnerJobVariable
 	for _, variable := range variables {
 		if variable.Sensitive {
+			if variable.Value == "" {
+				continue
+			}
 			secrets = append(secrets, variable)
 		}
 	}
