@@ -127,7 +127,7 @@ func (s *JobRunner) Run(job opslevel.RunnerJob, stdout, stderr *SafeBuffer) JobO
 		// TODO: get pod status or status message?
 		return JobOutcome{
 			Message: fmt.Sprintf("pod was not ready in %v REASON: %s", timeout, waitErr),
-			Outcome: opslevel.RunnerJobOutcomeEnumQueueTimeout,
+			Outcome: opslevel.RunnerJobOutcomeEnumPodTimeout,
 		}
 	}
 
