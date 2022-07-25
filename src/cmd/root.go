@@ -31,8 +31,7 @@ func Execute(v string, c string) {
 
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "./opslevel.yaml", "configuration options for the runner")
-	rootCmd.PersistentFlags().String("app-url", "https://app.opslevel.com", "The OpsLevel App Url. Overrides environment variable 'OPSLEVEL_APP_URL'")
-	rootCmd.PersistentFlags().String("api-url", "https://api.opslevel.com/graphql", "The OpsLevel API Url. Overrides environment variable 'OPSLEVEL_API_URL'")
+	rootCmd.PersistentFlags().String("api-url", "https://api.opslevel.com", "The OpsLevel API Url. Overrides environment variable 'OPSLEVEL_API_URL'")
 	rootCmd.PersistentFlags().String("api-token", "", "The OpsLevel API Token. Overrides environment variable 'OPSLEVEL_API_TOKEN'")
 	rootCmd.PersistentFlags().String("log-format", "TEXT", "overrides environment variable 'OPSLEVEL_LOG_FORMAT' (options [\"JSON\", \"TEXT\"])")
 	rootCmd.PersistentFlags().String("log-level", "INFO", "overrides environment variable 'OPSLEVEL_LOG_LEVEL' (options [\"ERROR\", \"WARN\", \"INFO\", \"DEBUG\"])")
@@ -44,10 +43,9 @@ func init() {
 	rootCmd.PersistentFlags().Int("pod-log-max-size", 1000000, "The max amount in bytes to buffer before pod logs are shipped to OpsLevel. Works in tandem with 'pod-log-max-interval'")
 
 	viper.BindPFlags(rootCmd.PersistentFlags())
-	viper.BindEnv("app-url", "OPSLEVEL_APP_URL")
 	viper.BindEnv("log-format", "OPSLEVEL_LOG_FORMAT")
 	viper.BindEnv("log-level", "OPSLEVEL_LOG_LEVEL")
-	viper.BindEnv("api-url", "OPSLEVEL_API_URL")
+	viper.BindEnv("api-url", "OPSLEVEL_API_URL", "OPSLEVEL_APP_URL")
 	viper.BindEnv("api-token", "OPSLEVEL_API_TOKEN")
 	viper.BindEnv("pod-max-wait", "OPSLEVEL_POD_MAX_WAIT")
 	viper.BindEnv("pod-namespace", "OPSLEVEL_POD_NAMESPACE")
