@@ -13,7 +13,7 @@ type SanitizeLogProcessor struct {
 func NewSanitizeLogProcessor(variables []opslevel.RunnerJobVariable) *SanitizeLogProcessor {
 	var secrets []opslevel.RunnerJobVariable
 	for _, variable := range variables {
-		if variable.Sensitive {
+		if variable.Sensitive && variable.Value != "" {
 			secrets = append(secrets, variable)
 		}
 	}

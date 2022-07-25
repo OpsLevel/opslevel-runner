@@ -1,0 +1,3 @@
+kind: Bugfix
+body: Fix log sanitizer when variable value is empty string
+time: 2022-07-20T17:25:41.32517-05:00
