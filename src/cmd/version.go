@@ -61,7 +61,7 @@ func getGoInfo() GoInfo {
 
 func getOpslevelVersion() OpslevelVersion {
 	// Need to update all of this when we switch over to resty client
-	url, err := url.Parse(viper.GetString("app-url"))
+	url, err := url.Parse(viper.GetString("api-url"))
 	cobra.CheckErr(err)
 
 	url.Path = "/api/ping"
