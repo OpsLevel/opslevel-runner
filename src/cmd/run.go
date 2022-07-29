@@ -116,6 +116,13 @@ func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 			err := errors.New(outcome.Message)
 			spanFinish.RecordError(err)
 			spanFinish.SetStatus(codes.Error, err.Error())
+
+			localHub := sentry.CurrentHub().Clone()
+			localHub.ConfigureScope(func(scope *sentry.Scope) {
+				scope.SetTag("outcome", string(outcome.Outcome))
+				scope.SetTag("job_id", job.Id.(string))
+			})
+			localHub.CaptureMessage(err.Error())
 		}
 		spanFinish.End()
 		spanStart.End()
