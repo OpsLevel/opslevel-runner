@@ -12,6 +12,7 @@ type OpsLevelAppendLogProcessor struct {
 	logger            zerolog.Logger
 	runnerId          string
 	jobId             string
+	jobNumber         string
 	maxBytes          int
 	maxTime           time.Duration
 	logLines          []string
@@ -21,12 +22,13 @@ type OpsLevelAppendLogProcessor struct {
 	elapsed           time.Duration
 }
 
-func NewOpsLevelAppendLogProcessor(client *opslevel.Client, logger zerolog.Logger, runnerId string, jobId string, maxBytes int, maxTime time.Duration) *OpsLevelAppendLogProcessor {
+func NewOpsLevelAppendLogProcessor(client *opslevel.Client, logger zerolog.Logger, runnerId string, jobId string, jobNumber string, maxBytes int, maxTime time.Duration) *OpsLevelAppendLogProcessor {
 	return &OpsLevelAppendLogProcessor{
 		client:            client,
 		logger:            logger,
 		runnerId:          runnerId,
 		jobId:             jobId,
+		jobNumber:         jobNumber,
 		maxBytes:          maxBytes,
 		maxTime:           maxTime,
 		logLines:          []string{},
@@ -74,16 +76,15 @@ func (s *OpsLevelAppendLogProcessor) Flush(outcome JobOutcome) {
 }
 
 func (s *OpsLevelAppendLogProcessor) submit() {
-	if s.client != nil {
+	if s.client != nil && len(s.logLines) > 0 {
 		err := s.client.RunnerAppendJobLog(opslevel.RunnerAppendJobLogInput{
 			RunnerId:    s.runnerId,
 			RunnerJobId: s.jobId,
 			SentAt:      opslevel.NewISO8601DateNow(),
 			Logs:        s.logLines,
 		})
-		// TODO: is there any reason we should retry for?
 		if err != nil {
-			s.logger.Error().Err(err).Msgf("error while appending '%d' log line(s) for job '%s'", len(s.logLines), s.jobId)
+			s.logger.Error().Err(err).Msgf("error while appending '%d' log line(s) for job '%s'", len(s.logLines), s.jobNumber)
 		}
 	}
 	s.logLinesBytesSize = 0

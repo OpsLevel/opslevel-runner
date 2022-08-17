@@ -1,14 +1,14 @@
 package pkg
 
 import (
-	"github.com/rs/zerolog/log"
 	"github.com/rocktavious/autopilot"
+	"github.com/rs/zerolog/log"
 	"testing"
 )
 
 func TestSetOutcomeVarLogProcessor(t *testing.T) {
 	// Arrange
-	p := NewSetOutcomeVarLogProcessor(nil, log.Logger, "1", "1")
+	p := NewSetOutcomeVarLogProcessor(nil, log.Logger, "1", "1", "1")
 	// Act
 	p.Process("set-outcome-var ")
 	p.Process("::set-outcome-var hello-world=42")

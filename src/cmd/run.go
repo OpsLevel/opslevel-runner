@@ -83,31 +83,33 @@ func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 	for {
 		job := <-jobQueue
 		ctx := context.Background()
+		jobId := job.Id.(string)
+		jobNumber := job.Number()
 
 		// TODO: If Log Level == Trace - add logging processor similar to `test` command?
 		streamer := pkg.NewLogStreamer(
 			logger,
-			pkg.NewSetOutcomeVarLogProcessor(client, logger, runnerId, job.Id.(string)),
+			pkg.NewSetOutcomeVarLogProcessor(client, logger, runnerId, jobId, jobNumber),
 			pkg.NewSanitizeLogProcessor(job.Variables),
 			pkg.NewPrefixLogProcessor(logPrefix),
-			pkg.NewOpsLevelAppendLogProcessor(client, logger, runnerId, job.Id.(string), logMaxBytes, logMaxDuration),
+			pkg.NewOpsLevelAppendLogProcessor(client, logger, runnerId, jobId, jobNumber, logMaxBytes, logMaxDuration),
 		)
 
 		jobStart := time.Now()
 		pkg.MetricJobsStarted.Inc()
 		pkg.MetricJobsProcessing.Inc()
-		logger.Info().Msgf("Starting job '%s'", job.Id)
+		logger.Info().Msgf("Starting job '%s'", jobNumber)
 
 		go streamer.Run()
 		ctx, spanStart := tracer.Start(ctx, "start-job",
 			trace.WithSpanKind(trace.SpanKindConsumer),
-			trace.WithAttributes(attribute.String("job-id", job.Id.(string))),
+			trace.WithAttributes(attribute.String("job", jobNumber)),
 		)
 		outcome := runner.Run(job, streamer.Stdout, streamer.Stderr)
 		ctx, spanFinish := tracer.Start(ctx,
 			"finish-job",
 			trace.WithSpanKind(trace.SpanKindConsumer),
-			trace.WithAttributes(attribute.String("job-id", job.Id.(string))))
+			trace.WithAttributes(attribute.String("job", jobNumber)))
 		streamer.Flush(outcome)
 		spanFinish.SetAttributes(
 			attribute.String("outcome", string(outcome.Outcome)),
@@ -120,16 +122,16 @@ func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 			localHub := sentry.CurrentHub().Clone()
 			localHub.ConfigureScope(func(scope *sentry.Scope) {
 				scope.SetTag("outcome", string(outcome.Outcome))
-				scope.SetTag("job_id", job.Id.(string))
+				scope.SetTag("job", jobNumber)
 			})
-			localHub.CaptureMessage(err.Error())
+			localHub.CaptureMessage(fmt.Sprintf("[job: %s] %s", jobNumber, err.Error()))
 		}
 		spanFinish.End()
 		spanStart.End()
 
 		jobDuration := time.Since(jobStart)
 		pkg.MetricJobsDuration.Observe(jobDuration.Seconds())
-		logger.Info().Msgf("Finished Job '%s' took '%s' and had outcome '%s'", job.Id, jobDuration, outcome.Outcome)
+		logger.Info().Msgf("Finished Job '%s' took '%s' and had outcome '%s'", jobNumber, jobDuration, outcome.Outcome)
 		pkg.MetricJobsFinished.WithLabelValues(string(outcome.Outcome)).Inc()
 		pkg.MetricJobsProcessing.Dec()
 	}
@@ -155,7 +157,7 @@ func jobPoller(runnerId string, jobQueue chan<- opslevel.RunnerJob) {
 				if job.Id == nil {
 					continue_polling = false
 				} else {
-					logger.Debug().Msgf("Enqueuing job '%s'", job.Id)
+					logger.Debug().Msgf("Enqueuing job '%s'", job.Number())
 					jobQueue <- *job
 				}
 			}

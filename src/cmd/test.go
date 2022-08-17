@@ -36,10 +36,10 @@ func doTest(cmd *cobra.Command, args []string) error {
 	}
 	streamer := pkg.NewLogStreamer(
 		log.Logger,
-		pkg.NewSetOutcomeVarLogProcessor(nil, log.Logger, "1", "1"),
+		pkg.NewSetOutcomeVarLogProcessor(nil, log.Logger, "1", "1", "1"),
 		pkg.NewSanitizeLogProcessor(job.Variables),
 		pkg.NewLoggerLogProcessor(log.Logger),
-		pkg.NewOpsLevelAppendLogProcessor(nil, log.Logger, "1", "1", 1024000, 30*time.Second),
+		pkg.NewOpsLevelAppendLogProcessor(nil, log.Logger, "1", "1", "1", 1024000, 30*time.Second),
 	)
 	runner, err := pkg.NewJobRunner(log.Logger, viper.GetString("pod-namespace"))
 	cobra.CheckErr(err)
