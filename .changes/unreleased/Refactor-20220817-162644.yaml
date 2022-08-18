@@ -1,3 +1,0 @@
-kind: Refactor
-body: Use JobNumber in observability messages vs JobId
-time: 2022-08-17T16:26:44.323555-05:00
