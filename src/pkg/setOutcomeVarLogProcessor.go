@@ -13,18 +13,20 @@ type SetOutcomeVarLogProcessor struct {
 	logger     zerolog.Logger
 	runnerId   string
 	jobId      string
+	jobNumber  string
 	regex      *regexp.Regexp
 	keyIndex   int
 	valueIndex int
 	vars       []opslevel.RunnerJobOutcomeVariable
 }
 
-func NewSetOutcomeVarLogProcessor(client *opslevel.Client, logger zerolog.Logger, runnerId string, jobId string) *SetOutcomeVarLogProcessor {
+func NewSetOutcomeVarLogProcessor(client *opslevel.Client, logger zerolog.Logger, runnerId string, jobId string, jobNumber string) *SetOutcomeVarLogProcessor {
 	return &SetOutcomeVarLogProcessor{
 		client:     client,
 		logger:     logger,
 		runnerId:   runnerId,
 		jobId:      jobId,
+		jobNumber:  jobNumber,
 		regex:      setOutcomeVarExp,
 		keyIndex:   setOutcomeVarExp.SubexpIndex("Key"),
 		valueIndex: setOutcomeVarExp.SubexpIndex("Value"),
@@ -50,7 +52,7 @@ func (s *SetOutcomeVarLogProcessor) Flush(outcome JobOutcome) {
 	}
 
 	if outcome.Outcome != opslevel.RunnerJobOutcomeEnumSuccess {
-		s.logger.Warn().Msgf("Job '%s' failed REASON: %s", s.jobId, outcome.Message)
+		s.logger.Warn().Msgf("Job '%s' failed REASON: %s", s.jobNumber, outcome.Message)
 	}
 	if s.client == nil {
 		return
@@ -62,6 +64,6 @@ func (s *SetOutcomeVarLogProcessor) Flush(outcome JobOutcome) {
 		OutcomeVariables: s.vars,
 	})
 	if err != nil {
-		s.logger.Error().Err(err).Msgf("error when reporting outcome '%s' for job '%s'", outcome.Outcome, s.jobId)
+		s.logger.Error().Err(err).Msgf("error when reporting outcome '%s' for job '%s'", outcome.Outcome, s.jobNumber)
 	}
 }
