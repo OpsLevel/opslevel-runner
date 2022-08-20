@@ -12,10 +12,20 @@ func TestSetOutcomeVarLogProcessor(t *testing.T) {
 	// Act
 	p.Process("set-outcome-var ")
 	p.Process("::set-outcome-var hello-world=42")
+	p.Process("::start-multiline-outcome-var multi")
+	p.Process("{")
+	p.Process("  \"hello\":\"world\",")
+	p.Process("  \"foo\":\"bar\"")
+	p.Process("}")
+	p.Process("::end-multiline-outcome-var")
 	p.Process("::set-var foo=bar")
 	p.Process("::set-outcome-var opslevel_testing=best")
 	// Assert
-	autopilot.Equals(t, 2, len(p.vars))
-	autopilot.Equals(t, "42", p.vars[0].Value)
-	autopilot.Equals(t, "opslevel_testing", p.vars[1].Key)
+	autopilot.Equals(t, 3, len(p.vars))
+	autopilot.Equals(t, "42", p.vars["hello-world"])
+	autopilot.Equals(t, "best", p.vars["opslevel_testing"])
+	autopilot.Equals(t, `{
+  "hello":"world",
+  "foo":"bar"
+}`, p.vars["multi"])
 }
