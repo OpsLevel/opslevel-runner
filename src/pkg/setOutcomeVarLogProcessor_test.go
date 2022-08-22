@@ -27,5 +27,5 @@ func TestSetOutcomeVarLogProcessor(t *testing.T) {
 	autopilot.Equals(t, `{
   "hello":"world",
   "foo":"bar"
-}`, p.vars["multi"])
+}`, p.vars["multi-var-name"])
 }
