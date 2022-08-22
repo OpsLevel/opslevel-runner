@@ -12,7 +12,7 @@ func TestSetOutcomeVarLogProcessor(t *testing.T) {
 	// Act
 	p.Process("set-outcome-var ")
 	p.Process("::set-outcome-var hello-world=42")
-	p.Process("::start-multiline-outcome-var multi")
+	p.Process("::start-multiline-outcome-var multi-var-name")
 	p.Process("{")
 	p.Process("  \"hello\":\"world\",")
 	p.Process("  \"foo\":\"bar\"")
