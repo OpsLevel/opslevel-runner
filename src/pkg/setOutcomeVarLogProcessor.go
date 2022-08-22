@@ -19,7 +19,7 @@ type SetOutcomeVarLogProcessor struct {
 	runnerId               string
 	jobId                  string
 	jobNumber              string
-	multilineOutcomeVarKey string
+	multilineOutcomeVarKey Stack[string]
 	vars                   map[string]string
 }
 
@@ -30,7 +30,7 @@ func NewSetOutcomeVarLogProcessor(client *opslevel.Client, logger zerolog.Logger
 		runnerId:               runnerId,
 		jobId:                  jobId,
 		jobNumber:              jobNumber,
-		multilineOutcomeVarKey: "",
+		multilineOutcomeVarKey: NewStack[string](""),
 		vars:                   map[string]string{},
 	}
 }
@@ -39,17 +39,21 @@ func (s *SetOutcomeVarLogProcessor) Process(line string) string {
 	// This is like a poor man's state machine
 	startOutcomeData := startOutcomeVarExp.FindStringSubmatch(line)
 	if len(startOutcomeData) > 0 {
-		s.multilineOutcomeVarKey = startOutcomeData[1]
+		s.multilineOutcomeVarKey.Push(startOutcomeData[1])
 		return ""
 	}
 	endOutcomeData := endOutcomeVarExp.FindStringSubmatch(line)
-	if len(endOutcomeData) > 0 {
-		s.vars[s.multilineOutcomeVarKey] = strings.TrimSuffix(s.vars[s.multilineOutcomeVarKey], "\n")
-		s.multilineOutcomeVarKey = ""
-		return ""
-	}
-	if s.multilineOutcomeVarKey != "" {
-		s.vars[s.multilineOutcomeVarKey] += fmt.Sprintf("%s\n", line)
+	currentKey := s.multilineOutcomeVarKey.Peek()
+	if currentKey != "" {
+		if len(endOutcomeData) > 0 {
+			key := s.multilineOutcomeVarKey.Pop()
+			if key != "" {
+				s.vars[key] = strings.TrimSuffix(s.vars[key], "\n")
+				return ""
+			}
+			return ""
+		}
+		s.vars[currentKey] += fmt.Sprintf("%s\n", line)
 		return ""
 	}
 
