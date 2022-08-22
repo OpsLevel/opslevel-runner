@@ -1,5 +1,7 @@
 package pkg
 
+// TODO: move this implementation to opslevel-common as there is no builtin golang stack
+
 type Stack[T any] struct {
 	Push   func(T)
 	Peek   func() T
