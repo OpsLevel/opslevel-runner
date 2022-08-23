@@ -30,6 +30,10 @@ func NewLogStreamer(logger zerolog.Logger, processors ...LogProcessor) LogStream
 	}
 }
 
+func (s *LogStreamer) AddProcessor(processor LogProcessor) {
+	s.processors = append(s.processors, processor)
+}
+
 func (s *LogStreamer) Run() {
 	s.logger.Trace().Msg("Starting log streamer ...")
 	for {
@@ -72,7 +76,7 @@ func (s *LogStreamer) Flush(outcome JobOutcome) {
 	s.quit <- true
 	time.Sleep(200 * time.Millisecond) // Allow 'Run' goroutine to quit
 	s.logger.Trace().Msg("Flushing log processors ...")
-	for i := len(s.processors)-1; i >= 0; i-- {
+	for i := len(s.processors) - 1; i >= 0; i-- {
 		s.processors[i].Flush(outcome)
 	}
 }
