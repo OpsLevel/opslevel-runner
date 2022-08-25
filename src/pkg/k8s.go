@@ -72,7 +72,27 @@ func (s *JobRunner) getPodEnv(configs []opslevel.RunnerJobVariable) []corev1.Env
 	return output
 }
 
-func (s *JobRunner) getPodObject(job opslevel.RunnerJob) *corev1.Pod {
+func (s *JobRunner) getConfigMapObject(identifier string, job opslevel.RunnerJob) *corev1.ConfigMap {
+	data := map[string]string{}
+	for _, file := range job.Files {
+		data[file.Name] = file.Contents
+	}
+	return &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      identifier,
+			Namespace: s.namespace,
+		},
+		Immutable: opslevel.Bool(true),
+		Data:      data,
+	}
+}
+
+func executable() *int32 {
+	value := int32(511)
+	return &value
+}
+
+func (s *JobRunner) getPodObject(identifier string, job opslevel.RunnerJob) *corev1.Pod {
 	// TODO: Allow configuration of PullPolicy
 	// TODO: Allow configuration of Labels
 	// TODO: Allow configuration of Annotations
@@ -80,11 +100,8 @@ func (s *JobRunner) getPodObject(job opslevel.RunnerJob) *corev1.Pod {
 	// TODO: Allow configuration of TerminationGracePeriodSeconds
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("opslevel-job-%s-%d", strings.ToLower(job.Id.(string)), time.Now().Unix()),
+			Name:      identifier,
 			Namespace: s.namespace,
-			Labels: map[string]string{
-				"app": "demo",
-			},
 		},
 		Spec: corev1.PodSpec{
 			TerminationGracePeriodSeconds: &[]int64{5}[0],
@@ -99,6 +116,26 @@ func (s *JobRunner) getPodObject(job opslevel.RunnerJob) *corev1.Pod {
 						"while :; do sleep 30; done",
 					},
 					Env: s.getPodEnv(job.Variables),
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "scripts",
+							ReadOnly:  true,
+							MountPath: "/opslevel",
+						},
+					},
+				},
+			},
+			Volumes: []corev1.Volume{
+				{
+					Name: "scripts",
+					VolumeSource: corev1.VolumeSource{
+						ConfigMap: &corev1.ConfigMapVolumeSource{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: identifier,
+							},
+							DefaultMode: executable(),
+						},
+					},
 				},
 			},
 		},
@@ -108,8 +145,21 @@ func (s *JobRunner) getPodObject(job opslevel.RunnerJob) *corev1.Pod {
 // TODO: Remove all usages of "Viper" they should be passed in at JobRunner configuraiton time
 func (s *JobRunner) Run(job opslevel.RunnerJob, stdout, stderr *SafeBuffer) JobOutcome {
 	id := job.Id.(string)
+	identifier := fmt.Sprintf("opslevel-job-%s-%d", job.Number(), time.Now().Unix())
 	// TODO: manage pods based on image for re-use?
-	pod, podErr := s.CreatePod(s.getPodObject(job))
+	cfgMap, cfgMapErr := s.CreateConfigMap(s.getConfigMapObject(identifier, job))
+	if cfgMapErr != nil {
+		return JobOutcome{
+			Message: fmt.Sprintf("failed to create configmap REASON: %s", cfgMapErr),
+			Outcome: opslevel.RunnerJobOutcomeEnumFailed,
+		}
+	}
+
+	// NOTE: do not use cobra.CheckErr after this point because this defer will never happen because os.Exit(1)
+	// TODO: if we reuse pods then delete should not happen?
+	defer s.DeleteConfigMap(cfgMap)
+
+	pod, podErr := s.CreatePod(s.getPodObject(identifier, job))
 	if podErr != nil {
 		return JobOutcome{
 			Message: fmt.Sprintf("failed to create pod REASON: %s", podErr),
@@ -117,7 +167,6 @@ func (s *JobRunner) Run(job opslevel.RunnerJob, stdout, stderr *SafeBuffer) JobO
 		}
 	}
 
-	// NOTE: do not use cobra.CheckErr after this point because this defer will never happen because os.Exit(1)
 	// TODO: if we reuse pods then delete should not happen
 	defer s.DeletePod(pod)
 
@@ -218,6 +267,11 @@ func (s *JobRunner) Exec(stdout, stderr *SafeBuffer, pod *corev1.Pod, containerN
 	})
 }
 
+func (s *JobRunner) CreateConfigMap(configMapConfig *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+	s.logger.Trace().Msgf("Creating configmap %s/%s ...", configMapConfig.Namespace, configMapConfig.Name)
+	return s.clientset.CoreV1().ConfigMaps(configMapConfig.Namespace).Create(context.TODO(), configMapConfig, metav1.CreateOptions{})
+}
+
 func (s *JobRunner) CreatePod(podConfig *corev1.Pod) (*corev1.Pod, error) {
 	s.logger.Trace().Msgf("Creating pod %s/%s ...", podConfig.Namespace, podConfig.Name)
 	return s.clientset.CoreV1().Pods(podConfig.Namespace).Create(context.TODO(), podConfig, metav1.CreateOptions{})
@@ -238,6 +292,11 @@ func (s *JobRunner) WaitForPod(podConfig *corev1.Pod, timeout time.Duration) err
 		}
 		return false, nil
 	})
+}
+
+func (s *JobRunner) DeleteConfigMap(configMapConfig *corev1.ConfigMap) error {
+	s.logger.Trace().Msgf("Deleting configmap %s/%s ...", configMapConfig.Namespace, configMapConfig.Name)
+	return s.clientset.CoreV1().ConfigMaps(configMapConfig.Namespace).Delete(context.TODO(), configMapConfig.Name, metav1.DeleteOptions{})
 }
 
 func (s *JobRunner) DeletePod(podConfig *corev1.Pod) error {

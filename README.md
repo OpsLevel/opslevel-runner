@@ -45,6 +45,7 @@ commands:
   - echo $TEST
   - echo $Secret
   - echo $NotSecret
+  - /opslevel/check.sh
 variables:
   - key: Secret
     value: "World!"
@@ -52,6 +53,13 @@ variables:
   - key: NotSecret
     value: "World!"
     sensitive: false
+files:
+  - name: check.sh
+    contents: |
+      #! /bin/bash
+      echo "Hello from inside the script!"
+      echo "Secrets are still ${Secret}"
+      sleep 2
 EOF
 ```
 
