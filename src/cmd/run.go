@@ -9,6 +9,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
+	"strings"
 	"time"
 
 	"github.com/opslevel/opslevel-go/v2022"
@@ -86,7 +87,6 @@ func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 		jobId := job.Id.(string)
 		jobNumber := job.Number()
 
-		// TODO: If Log Level == Trace - add logging processor similar to `test` command?
 		streamer := pkg.NewLogStreamer(
 			logger,
 			pkg.NewSetOutcomeVarLogProcessor(client, logger, runnerId, jobId, jobNumber),
@@ -94,6 +94,9 @@ func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 			pkg.NewPrefixLogProcessor(logPrefix),
 			pkg.NewOpsLevelAppendLogProcessor(client, logger, runnerId, jobId, jobNumber, logMaxBytes, logMaxDuration),
 		)
+		if strings.ToLower(viper.GetString("log-level")) == "trace" {
+			streamer.AddProcessor(pkg.NewLoggerLogProcessor(logger))
+		}
 
 		jobStart := time.Now()
 		pkg.MetricJobsStarted.Inc()
