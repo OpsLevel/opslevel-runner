@@ -10,6 +10,7 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/opslevel/opslevel-go/v2022"
@@ -47,19 +48,25 @@ func doRun(cmd *cobra.Command, args []string) {
 
 	log.Info().Msgf("Starting runner for id '%s'", runner.Id)
 	pkg.StartMetricsServer(runner.Id.(string), viper.GetInt("metrics-port"))
-	startWorkers(runner.Id.(string))
-	<-opslevel_common.InitSignalHandler() // Enter Forever Loop
+	stop := opslevel_common.InitSignalHandler()
+	wg := startWorkers(runner.Id.(string), stop)
+	<-stop // Enter Forever Loop
+	log.Info().Msgf("interupt - waiting for jobs to complete ...")
+	wg.Wait()
 	log.Info().Msgf("Unregister runner for id '%s'...", runner.Id)
 	client.RunnerUnregister(&runner.Id)
 }
 
-func startWorkers(runnerId string) {
+func startWorkers(runnerId string, stop <-chan struct{}) *sync.WaitGroup {
+	wg := sync.WaitGroup{}
 	concurrency := getConcurrency()
+	wg.Add(concurrency)
 	jobQueue := make(chan opslevel.RunnerJob)
 	for w := 1; w <= concurrency; w++ {
-		go jobWorker(w, runnerId, jobQueue)
+		go jobWorker(&wg, w, runnerId, jobQueue)
 	}
-	go jobPoller(runnerId, jobQueue)
+	go jobPoller(runnerId, stop, jobQueue)
+	return &wg
 }
 
 func getConcurrency() int {
@@ -70,7 +77,7 @@ func getConcurrency() int {
 	return concurrency
 }
 
-func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
+func jobWorker(wg *sync.WaitGroup, index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 	logMaxBytes := viper.GetInt("log-max-bytes")
 	logMaxDuration := time.Duration(viper.GetInt("log-max-time")) * time.Second
 	logPrefix := func() string { return fmt.Sprintf("%s [%d] ", time.Now().UTC().Format(time.RFC3339), index) }
@@ -80,9 +87,9 @@ func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 	runner, err := pkg.NewJobRunner(logger, viper.GetString("pod-namespace"))
 	pkg.CheckErr(err)
 
-	logger.Info().Msg("Starting job processor ...")
-	for {
-		job := <-jobQueue
+	logger.Info().Msgf("Starting job processor %d ...", index)
+	defer wg.Done()
+	for job := range jobQueue {
 		ctx := context.Background()
 		jobId := job.Id.(string)
 		jobNumber := job.Number()
@@ -138,34 +145,42 @@ func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 		pkg.MetricJobsFinished.WithLabelValues(string(outcome.Outcome)).Inc()
 		pkg.MetricJobsProcessing.Dec()
 	}
+	logger.Info().Msgf("Shutting down job processor %d ...", index)
 }
 
-func jobPoller(runnerId string, jobQueue chan<- opslevel.RunnerJob) {
+func jobPoller(runnerId string, stop <-chan struct{}, jobQueue chan<- opslevel.RunnerJob) {
 	logger := log.With().Int("worker", 0).Logger()
 	client := getClientGQL()
 	token := opslevel.NewID("")
 	poll_wait_time := time.Second * time.Duration(viper.GetInt("poll-interval"))
 	logger.Info().Msg("Starting polling for jobs")
 	for {
-		logger.Trace().Msg("Polling for jobs ...")
-		continue_polling := true
-		for continue_polling {
-			logger.Debug().Msgf("Get pending jobs with lastUpdateToken '%v' ...", *token)
-			job, nextToken, err := client.RunnerGetPendingJob(runnerId, token)
-			if err != nil {
-				logger.Error().Err(err).Msg("got error when getting pending job")
-				continue_polling = false
-			} else {
-				token = nextToken
-				if job.Id == nil {
+		select {
+		case <-stop:
+			logger.Info().Msg("Stopped Polling for jobs ...")
+			close(jobQueue)
+			return
+		default:
+			logger.Trace().Msg("Polling for jobs ...")
+			continue_polling := true
+			for continue_polling {
+				logger.Debug().Msgf("Get pending jobs with lastUpdateToken '%v' ...", *token)
+				job, nextToken, err := client.RunnerGetPendingJob(runnerId, token)
+				if err != nil {
+					logger.Error().Err(err).Msg("got error when getting pending job")
 					continue_polling = false
 				} else {
-					logger.Debug().Msgf("Enqueuing job '%s'", job.Number())
-					jobQueue <- *job
+					token = nextToken
+					if job.Id == nil {
+						continue_polling = false
+					} else {
+						logger.Debug().Msgf("Enqueuing job '%s'", job.Number())
+						jobQueue <- *job
+					}
 				}
 			}
+			logger.Trace().Msgf("Finished Polling for jobs sleeping for %s ...", poll_wait_time)
+			time.Sleep(poll_wait_time)
 		}
-		logger.Trace().Msgf("Finished Polling for jobs sleeping for %s ...", poll_wait_time)
-		time.Sleep(poll_wait_time)
 	}
 }
