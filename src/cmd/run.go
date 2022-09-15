@@ -103,7 +103,8 @@ func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 		pkg.MetricJobsProcessing.Inc()
 		logger.Info().Msgf("Starting job '%s'", jobNumber)
 
-		go streamer.Run()
+		logChan := make(chan []string, 1)
+		go streamer.Run(logChan)
 		ctx, spanStart := tracer.Start(ctx, "start-job",
 			trace.WithSpanKind(trace.SpanKindConsumer),
 			trace.WithAttributes(attribute.String("job", jobNumber)),
@@ -127,7 +128,8 @@ func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 				scope.SetTag("outcome", string(outcome.Outcome))
 				scope.SetTag("job", jobNumber)
 			})
-			localHub.CaptureMessage(fmt.Sprintf("[job: %s] %s", jobNumber, err.Error()))
+			logBuffer := <-logChan
+			localHub.CaptureMessage(fmt.Sprintf("[job: %s] %s logs: %v", jobNumber, err.Error(), logBuffer[len(logBuffer)-50:]))
 		}
 		spanFinish.End()
 		spanStart.End()

@@ -34,7 +34,8 @@ func (s *LogStreamer) AddProcessor(processor LogProcessor) {
 	s.processors = append(s.processors, processor)
 }
 
-func (s *LogStreamer) Run() {
+func (s *LogStreamer) Run(logChan chan []string) {
+	var logBuffer []string
 	s.logger.Trace().Msg("Starting log streamer ...")
 	for {
 		select {
@@ -46,6 +47,7 @@ func (s *LogStreamer) Run() {
 				line, err := s.Stderr.ReadString('\n')
 				if err == nil {
 					line = strings.TrimSuffix(line, "\n")
+					logBuffer = append(logBuffer, line)
 					for _, processor := range s.processors {
 						line = processor.Process(line)
 					}
@@ -62,6 +64,7 @@ func (s *LogStreamer) Run() {
 			}
 		}
 	}
+	logChan <- logBuffer
 }
 
 func (s *LogStreamer) Flush(outcome JobOutcome) {
