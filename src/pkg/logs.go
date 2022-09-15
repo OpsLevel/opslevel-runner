@@ -1,6 +1,7 @@
 package pkg
 
 import (
+	"container/ring"
 	"github.com/rs/zerolog"
 	"strings"
 	"time"
@@ -17,6 +18,7 @@ type LogStreamer struct {
 	processors []LogProcessor
 	logger     zerolog.Logger
 	quit       chan bool
+	LogBuffer  *ring.Ring
 }
 
 func NewLogStreamer(logger zerolog.Logger, processors ...LogProcessor) LogStreamer {
@@ -34,8 +36,8 @@ func (s *LogStreamer) AddProcessor(processor LogProcessor) {
 	s.processors = append(s.processors, processor)
 }
 
-func (s *LogStreamer) Run(logChan chan []string) {
-	var logBuffer []string
+func (s *LogStreamer) Run() {
+	s.LogBuffer = ring.New(20)
 	s.logger.Trace().Msg("Starting log streamer ...")
 	for {
 		select {
@@ -47,7 +49,8 @@ func (s *LogStreamer) Run(logChan chan []string) {
 				line, err := s.Stderr.ReadString('\n')
 				if err == nil {
 					line = strings.TrimSuffix(line, "\n")
-					logBuffer = append(logBuffer, line)
+					s.LogBuffer.Value = line
+					s.LogBuffer.Next()
 					for _, processor := range s.processors {
 						line = processor.Process(line)
 					}
@@ -57,6 +60,8 @@ func (s *LogStreamer) Run(logChan chan []string) {
 				line, err := s.Stdout.ReadString('\n')
 				if err == nil {
 					line = strings.TrimSuffix(line, "\n")
+					s.LogBuffer.Value = line
+					s.LogBuffer.Next()
 					for _, processor := range s.processors {
 						line = processor.Process(line)
 					}
@@ -64,7 +69,6 @@ func (s *LogStreamer) Run(logChan chan []string) {
 			}
 		}
 	}
-	logChan <- logBuffer
 }
 
 func (s *LogStreamer) Flush(outcome JobOutcome) {
