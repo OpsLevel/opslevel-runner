@@ -18,7 +18,7 @@ type LogStreamer struct {
 	processors []LogProcessor
 	logger     zerolog.Logger
 	quit       chan bool
-	LogBuffer  *ring.Ring
+	logBuffer  *ring.Ring
 }
 
 func NewLogStreamer(logger zerolog.Logger, processors ...LogProcessor) LogStreamer {
@@ -29,6 +29,7 @@ func NewLogStreamer(logger zerolog.Logger, processors ...LogProcessor) LogStream
 		processors: processors,
 		logger:     logger,
 		quit:       quit,
+		logBuffer:  ring.New(20),
 	}
 }
 
@@ -36,8 +37,17 @@ func (s *LogStreamer) AddProcessor(processor LogProcessor) {
 	s.processors = append(s.processors, processor)
 }
 
+func (s *LogStreamer) GetLogBuffer() []string {
+	output := []string{}
+	s.logBuffer.Do(func(line any) {
+		if line != nil {
+			output = append(output, line.(string))
+		}
+	})
+	return output
+}
+
 func (s *LogStreamer) Run() {
-	s.LogBuffer = ring.New(20)
 	s.logger.Trace().Msg("Starting log streamer ...")
 	for {
 		select {
@@ -49,8 +59,8 @@ func (s *LogStreamer) Run() {
 				line, err := s.Stderr.ReadString('\n')
 				if err == nil {
 					line = strings.TrimSuffix(line, "\n")
-					s.LogBuffer.Value = line
-					s.LogBuffer = s.LogBuffer.Next()
+					s.logBuffer.Value = line
+					s.logBuffer = s.logBuffer.Next()
 					for _, processor := range s.processors {
 						line = processor.Process(line)
 					}
@@ -60,8 +70,8 @@ func (s *LogStreamer) Run() {
 				line, err := s.Stdout.ReadString('\n')
 				if err == nil {
 					line = strings.TrimSuffix(line, "\n")
-					s.LogBuffer.Value = line
-					s.LogBuffer = s.LogBuffer.Next()
+					s.logBuffer.Value = line
+					s.logBuffer = s.logBuffer.Next()
 					for _, processor := range s.processors {
 						line = processor.Process(line)
 					}
