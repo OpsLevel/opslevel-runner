@@ -59,22 +59,22 @@ func (s *LogStreamer) Run() {
 				line, err := s.Stderr.ReadString('\n')
 				if err == nil {
 					line = strings.TrimSuffix(line, "\n")
-					s.logBuffer.Value = line
-					s.logBuffer = s.logBuffer.Next()
 					for _, processor := range s.processors {
 						line = processor.Process(line)
 					}
+					s.logBuffer.Value = line
+					s.logBuffer = s.logBuffer.Next()
 				}
 			}
 			for len(s.Stdout.String()) > 0 {
 				line, err := s.Stdout.ReadString('\n')
 				if err == nil {
 					line = strings.TrimSuffix(line, "\n")
-					s.logBuffer.Value = line
-					s.logBuffer = s.logBuffer.Next()
 					for _, processor := range s.processors {
 						line = processor.Process(line)
 					}
+					s.logBuffer.Value = line
+					s.logBuffer = s.logBuffer.Next()
 				}
 			}
 		}
