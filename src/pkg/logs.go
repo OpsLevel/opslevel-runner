@@ -50,7 +50,7 @@ func (s *LogStreamer) Run() {
 				if err == nil {
 					line = strings.TrimSuffix(line, "\n")
 					s.LogBuffer.Value = line
-					s.LogBuffer.Next()
+					s.LogBuffer = s.LogBuffer.Next()
 					for _, processor := range s.processors {
 						line = processor.Process(line)
 					}
@@ -61,7 +61,7 @@ func (s *LogStreamer) Run() {
 				if err == nil {
 					line = strings.TrimSuffix(line, "\n")
 					s.LogBuffer.Value = line
-					s.LogBuffer.Next()
+					s.LogBuffer = s.LogBuffer.Next()
 					for _, processor := range s.processors {
 						line = processor.Process(line)
 					}
