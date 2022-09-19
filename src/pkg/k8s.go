@@ -115,6 +115,7 @@ func (s *JobRunner) getPodObject(identifier string, job opslevel.RunnerJob) *cor
 						"-c",
 						"while :; do sleep 30; done",
 					},
+					corev1.ResourceRequirements{Requests: }
 					Env: s.getPodEnv(job.Variables),
 					VolumeMounts: []corev1.VolumeMount{
 						{
@@ -125,6 +126,7 @@ func (s *JobRunner) getPodObject(identifier string, job opslevel.RunnerJob) *cor
 					},
 				},
 			},
+			corev1.ResourceRequirements{Limits: }
 			Volumes: []corev1.Volume{
 				{
 					Name: "scripts",
