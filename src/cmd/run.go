@@ -122,12 +122,17 @@ func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 			spanFinish.RecordError(err)
 			spanFinish.SetStatus(codes.Error, err.Error())
 
+			logs := streamer.GetLogBuffer()
+
 			localHub := sentry.CurrentHub().Clone()
 			localHub.ConfigureScope(func(scope *sentry.Scope) {
 				scope.SetTag("outcome", string(outcome.Outcome))
 				scope.SetTag("job", jobNumber)
+				scope.SetContext("logs", map[string]interface{}{
+					"runner_logs": logs,
+				})
 			})
-			localHub.CaptureMessage(fmt.Sprintf("[job: %s] %s", jobNumber, err.Error()))
+			localHub.CaptureMessage(fmt.Sprintf("[job: %s] Ended with Outcome: %s", jobNumber, string(outcome.Outcome)))
 		}
 		spanFinish.End()
 		spanStart.End()

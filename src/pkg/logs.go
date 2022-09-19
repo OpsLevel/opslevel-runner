@@ -1,6 +1,7 @@
 package pkg
 
 import (
+	"container/ring"
 	"github.com/rs/zerolog"
 	"strings"
 	"time"
@@ -17,6 +18,7 @@ type LogStreamer struct {
 	processors []LogProcessor
 	logger     zerolog.Logger
 	quit       chan bool
+	logBuffer  *ring.Ring
 }
 
 func NewLogStreamer(logger zerolog.Logger, processors ...LogProcessor) LogStreamer {
@@ -27,11 +29,22 @@ func NewLogStreamer(logger zerolog.Logger, processors ...LogProcessor) LogStream
 		processors: processors,
 		logger:     logger,
 		quit:       quit,
+		logBuffer:  ring.New(20),
 	}
 }
 
 func (s *LogStreamer) AddProcessor(processor LogProcessor) {
 	s.processors = append(s.processors, processor)
+}
+
+func (s *LogStreamer) GetLogBuffer() []string {
+	output := []string{}
+	s.logBuffer.Do(func(line any) {
+		if line != nil {
+			output = append(output, line.(string))
+		}
+	})
+	return output
 }
 
 func (s *LogStreamer) Run() {
@@ -49,6 +62,8 @@ func (s *LogStreamer) Run() {
 					for _, processor := range s.processors {
 						line = processor.Process(line)
 					}
+					s.logBuffer.Value = line
+					s.logBuffer = s.logBuffer.Next()
 				}
 			}
 			for len(s.Stdout.String()) > 0 {
@@ -58,6 +73,8 @@ func (s *LogStreamer) Run() {
 					for _, processor := range s.processors {
 						line = processor.Process(line)
 					}
+					s.logBuffer.Value = line
+					s.logBuffer = s.logBuffer.Next()
 				}
 			}
 		}
