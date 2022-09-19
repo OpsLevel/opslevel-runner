@@ -132,7 +132,7 @@ func jobWorker(index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
 					"runner_logs": logs,
 				})
 			})
-			localHub.CaptureMessage(fmt.Sprintf("[job: %s] %s", jobNumber, err.Error()))
+			localHub.CaptureMessage(fmt.Sprintf("[job: %s] Ended with Outcome: %s", jobNumber, string(outcome.Outcome)))
 		}
 		spanFinish.End()
 		spanStart.End()
