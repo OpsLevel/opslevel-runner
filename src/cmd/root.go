@@ -38,6 +38,10 @@ func init() {
 
 	rootCmd.PersistentFlags().Int("pod-max-wait", 60, "The max amount of time to wait for the job pod to become healthy.")
 	rootCmd.PersistentFlags().String("pod-namespace", "default", "The kubernetes namespace to create pods in.")
+	rootCmd.PersistentFlags().Int64("pod-requests-cpu", 1000, "Default is in millicores.")
+	rootCmd.PersistentFlags().Int64("pod-requests-memory", 1024, "Pod job resource requests in MB.")
+	rootCmd.PersistentFlags().Int64("pod-limits-cpu", 1000, "Default is in millicores.")
+	rootCmd.PersistentFlags().Int64("pod-limits-memory", 1024, "Pod job resource limits in MB.")
 	rootCmd.PersistentFlags().String("pod-shell", "/bin/sh", "The shell to use for commands inside the pod.")
 	rootCmd.PersistentFlags().Int("pod-log-max-interval", 30, "The max amount of time between when pod logs are shipped to OpsLevel. Works in tandem with 'pod-log-max-size'")
 	rootCmd.PersistentFlags().Int("pod-log-max-size", 1000000, "The max amount in bytes to buffer before pod logs are shipped to OpsLevel. Works in tandem with 'pod-log-max-interval'")

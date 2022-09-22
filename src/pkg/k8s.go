@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"strings"
 	"time"
 
@@ -36,6 +37,7 @@ type JobRunner struct {
 	namespace string
 	config    *rest.Config
 	clientset *kubernetes.Clientset
+	resources JobPodResourceDefs
 }
 
 type JobOutcome struct {
@@ -44,7 +46,14 @@ type JobOutcome struct {
 	OutcomeVariables []opslevel.RunnerJobOutcomeVariable
 }
 
-func NewJobRunner(logger zerolog.Logger, namespace string) (*JobRunner, error) {
+type JobPodResourceDefs struct {
+	CpuReq   int64 //in millicores!
+	MemReq   int64 //in MB
+	CpuLimit int64 //in millicores!
+	MemLimit int64 //in MB
+}
+
+func NewJobRunner(logger zerolog.Logger, namespace string, resources JobPodResourceDefs) (*JobRunner, error) {
 	config, err := getKubernetesConfig()
 	if err != nil {
 		return nil, err
@@ -58,6 +67,7 @@ func NewJobRunner(logger zerolog.Logger, namespace string) (*JobRunner, error) {
 		namespace: namespace,
 		config:    config,
 		clientset: clientset,
+		resources: resources,
 	}, nil
 }
 
@@ -115,7 +125,16 @@ func (s *JobRunner) getPodObject(identifier string, job opslevel.RunnerJob) *cor
 						"-c",
 						"while :; do sleep 30; done",
 					},
-					corev1.ResourceRequirements{Requests: }
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    *resource.NewMilliQuantity(s.resources.CpuReq, resource.DecimalSI),
+							corev1.ResourceMemory: *resource.NewQuantity(s.resources.MemReq, resource.BinarySI),
+						},
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    *resource.NewMilliQuantity(s.resources.CpuLimit, resource.DecimalSI),
+							corev1.ResourceMemory: *resource.NewQuantity(s.resources.MemLimit, resource.BinarySI),
+						},
+					},
 					Env: s.getPodEnv(job.Variables),
 					VolumeMounts: []corev1.VolumeMount{
 						{
@@ -126,7 +145,6 @@ func (s *JobRunner) getPodObject(identifier string, job opslevel.RunnerJob) *cor
 					},
 				},
 			},
-			corev1.ResourceRequirements{Limits: }
 			Volumes: []corev1.Volume{
 				{
 					Name: "scripts",

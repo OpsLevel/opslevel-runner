@@ -57,6 +57,15 @@ func doRun(cmd *cobra.Command, args []string) {
 	client.RunnerUnregister(&runner.Id)
 }
 
+func newJobPodResourceDefs() pkg.JobPodResourceDefs {
+	return pkg.JobPodResourceDefs{
+		CpuReq:   viper.GetInt64("pod-requests-cpu"),
+		MemReq:   viper.GetInt64("pod-requests-memory"),
+		CpuLimit: viper.GetInt64("pod-limits-cpu"),
+		MemLimit: viper.GetInt64("pod-limits-memory"),
+	}
+}
+
 func startWorkers(runnerId string, stop <-chan struct{}) *sync.WaitGroup {
 	wg := sync.WaitGroup{}
 	concurrency := getConcurrency()
@@ -84,7 +93,8 @@ func jobWorker(wg *sync.WaitGroup, index int, runnerId string, jobQueue <-chan o
 	logger := log.With().Int("worker", index).Logger()
 	client := getClientGQL()
 	tracer := pkg.GetTracer()
-	runner, err := pkg.NewJobRunner(logger, viper.GetString("pod-namespace"))
+	podResources := newJobPodResourceDefs()
+	runner, err := pkg.NewJobRunner(logger, viper.GetString("pod-namespace"), podResources)
 	pkg.CheckErr(err)
 
 	logger.Info().Msgf("Starting job processor %d ...", index)
