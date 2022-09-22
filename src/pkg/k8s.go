@@ -126,13 +126,13 @@ func (s *JobRunner) getPodObject(identifier string, job opslevel.RunnerJob) *cor
 						"while :; do sleep 30; done",
 					},
 					Resources: corev1.ResourceRequirements{
-						Limits: corev1.ResourceList{
-							corev1.ResourceCPU:    resource.MustParse("2.5"),
-							corev1.ResourceMemory: resource.MustParse("1024Mi"),
-						},
 						Requests: corev1.ResourceList{
-							corev1.ResourceCPU:    resource.MustParse(".5"),
-							corev1.ResourceMemory: resource.MustParse("256Mi"),
+							corev1.ResourceCPU:    *resource.NewMilliQuantity(s.resources.CpuReq, resource.DecimalSI),
+							corev1.ResourceMemory: *resource.NewQuantity(s.resources.MemReq, resource.BinarySI),
+						},
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    *resource.NewMilliQuantity(s.resources.CpuLimit, resource.DecimalSI),
+							corev1.ResourceMemory: *resource.NewQuantity(s.resources.MemLimit, resource.BinarySI),
 						},
 					},
 					Env: s.getPodEnv(job.Variables),
