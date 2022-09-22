@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"strings"
 	"time"
 
@@ -32,10 +33,10 @@ type JobConfig struct {
 }
 
 type JobRunner struct {
-	logger    zerolog.Logger
-	namespace string
-	config    *rest.Config
-	clientset *kubernetes.Clientset
+	logger       zerolog.Logger
+	config       *rest.Config
+	clientset    *kubernetes.Clientset
+	jobPodConfig JobPodConfig
 }
 
 type JobOutcome struct {
@@ -44,7 +45,15 @@ type JobOutcome struct {
 	OutcomeVariables []opslevel.RunnerJobOutcomeVariable
 }
 
-func NewJobRunner(logger zerolog.Logger, namespace string) (*JobRunner, error) {
+type JobPodConfig struct {
+	Namespace   string
+	CpuRequests int64 //in millicores!
+	MemRequests int64 //in MB
+	CpuLimit    int64 //in millicores!
+	MemLimit    int64 //in MB
+}
+
+func NewJobRunner(logger zerolog.Logger, jobPodConfig JobPodConfig) (*JobRunner, error) {
 	config, err := getKubernetesConfig()
 	if err != nil {
 		return nil, err
@@ -54,10 +63,10 @@ func NewJobRunner(logger zerolog.Logger, namespace string) (*JobRunner, error) {
 		return nil, err
 	}
 	return &JobRunner{
-		logger:    logger,
-		namespace: namespace,
-		config:    config,
-		clientset: clientset,
+		logger:       logger,
+		config:       config,
+		clientset:    clientset,
+		jobPodConfig: jobPodConfig,
 	}, nil
 }
 
@@ -80,7 +89,7 @@ func (s *JobRunner) getConfigMapObject(identifier string, job opslevel.RunnerJob
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      identifier,
-			Namespace: s.namespace,
+			Namespace: s.jobPodConfig.Namespace,
 		},
 		Immutable: opslevel.Bool(true),
 		Data:      data,
@@ -101,7 +110,7 @@ func (s *JobRunner) getPodObject(identifier string, job opslevel.RunnerJob) *cor
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      identifier,
-			Namespace: s.namespace,
+			Namespace: s.jobPodConfig.Namespace,
 		},
 		Spec: corev1.PodSpec{
 			TerminationGracePeriodSeconds: &[]int64{5}[0],
@@ -114,6 +123,16 @@ func (s *JobRunner) getPodObject(identifier string, job opslevel.RunnerJob) *cor
 						"/bin/sh",
 						"-c",
 						"while :; do sleep 30; done",
+					},
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceCPU:    *resource.NewMilliQuantity(s.jobPodConfig.CpuRequests, resource.DecimalSI),
+							corev1.ResourceMemory: *resource.NewQuantity(s.jobPodConfig.MemRequests, resource.BinarySI),
+						},
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    *resource.NewMilliQuantity(s.jobPodConfig.CpuLimit, resource.DecimalSI),
+							corev1.ResourceMemory: *resource.NewQuantity(s.jobPodConfig.MemLimit, resource.BinarySI),
+						},
 					},
 					Env: s.getPodEnv(job.Variables),
 					VolumeMounts: []corev1.VolumeMount{

@@ -78,13 +78,15 @@ func getConcurrency() int {
 }
 
 func jobWorker(wg *sync.WaitGroup, index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
-	logMaxBytes := viper.GetInt("log-max-bytes")
-	logMaxDuration := time.Duration(viper.GetInt("log-max-time")) * time.Second
+	logMaxBytes := viper.GetInt("pod-log-max-size")
+	logMaxDuration := time.Duration(viper.GetInt("pod-log-max-interval")) * time.Second
 	logPrefix := func() string { return fmt.Sprintf("%s [%d] ", time.Now().UTC().Format(time.RFC3339), index) }
+	logLevel := strings.ToLower(viper.GetString("log-level"))
 	logger := log.With().Int("worker", index).Logger()
 	client := getClientGQL()
 	tracer := pkg.GetTracer()
-	runner, err := pkg.NewJobRunner(logger, viper.GetString("pod-namespace"))
+	podConfig := newJobPodConfig()
+	runner, err := pkg.NewJobRunner(logger, podConfig)
 	pkg.CheckErr(err)
 
 	logger.Info().Msgf("Starting job processor %d ...", index)
@@ -101,7 +103,7 @@ func jobWorker(wg *sync.WaitGroup, index int, runnerId string, jobQueue <-chan o
 			pkg.NewPrefixLogProcessor(logPrefix),
 			pkg.NewOpsLevelAppendLogProcessor(client, logger, runnerId, jobId, jobNumber, logMaxBytes, logMaxDuration),
 		)
-		if strings.ToLower(viper.GetString("log-level")) == "trace" {
+		if logLevel == "trace" {
 			streamer.AddProcessor(pkg.NewLoggerLogProcessor(logger))
 		}
 
