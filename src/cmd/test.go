@@ -41,8 +41,8 @@ func doTest(cmd *cobra.Command, args []string) error {
 		pkg.NewLoggerLogProcessor(log.Logger),
 		pkg.NewOpsLevelAppendLogProcessor(nil, log.Logger, "1", "1", "1", 1024000, 30*time.Second),
 	)
-	resources := newJobPodResourceDefs()
-	runner, err := pkg.NewJobRunner(log.Logger, viper.GetString("pod-namespace"), resources)
+	jobPodConfig := newJobPodConfig()
+	runner, err := pkg.NewJobRunner(log.Logger, jobPodConfig)
 	cobra.CheckErr(err)
 
 	go streamer.Run()

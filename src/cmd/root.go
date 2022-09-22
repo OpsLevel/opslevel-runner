@@ -59,6 +59,16 @@ func init() {
 	cobra.OnInitialize(initConfig)
 }
 
+func newJobPodConfig() pkg.JobPodConfig {
+	return pkg.JobPodConfig{
+		Namespace:   viper.GetString("pod-namespace"),
+		CpuRequests: viper.GetInt64("pod-requests-cpu"),
+		MemRequests: viper.GetInt64("pod-requests-memory"),
+		CpuLimit:    viper.GetInt64("pod-limits-cpu"),
+		MemLimit:    viper.GetInt64("pod-limits-memory"),
+	}
+}
+
 func initConfig() {
 	readConfig()
 	setupLogging()
