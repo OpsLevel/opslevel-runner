@@ -15,6 +15,8 @@
         <img src="https://img.shields.io/github/downloads/OpsLevel/opslevel-runner/total" /></a>
 </p>
 
+[![Overall](https://img.shields.io/endpoint?style=flat&url=https%3A%2F%2Fapp.opslevel.com%2Fapi%2Fservice_level%2FjcZ9Qt0e3fce3G6Xbo767Z2tXbKKKZ6qsRGzHZWwRME)](https://app.opslevel.com/services/opslevel_runner/maturity-report)
+
 # opslevel-runner
 OpsLevel Runner is the Kubernetes based job processor for [OpsLevel](https://www.opslevel.com/)
 
