@@ -3,14 +3,9 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"net/url"
 	"runtime"
 
-	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 type Build struct {
@@ -60,19 +55,10 @@ func getGoInfo() GoInfo {
 }
 
 func getOpslevelVersion() OpslevelVersion {
-	// Need to update all of this when we switch over to resty client
-	url, err := url.Parse(viper.GetString("api-url"))
+	opslevelVersion := OpslevelVersion{}
+	_, err := getClientRest().R().SetResult(&opslevelVersion).Get("api/ping")
 	cobra.CheckErr(err)
 
-	url.Path = "/api/ping"
-	response, err := http.Get(url.String())
-	cobra.CheckErr(err)
-
-	responseData, err := ioutil.ReadAll(response.Body)
-	cobra.CheckErr(err)
-
-	var opslevelVersion OpslevelVersion
-	json.Unmarshal(responseData, &opslevelVersion)
 	if len(opslevelVersion.Commit) >= 12 {
 		opslevelVersion.Commit = opslevelVersion.Commit[:12]
 	}
@@ -84,24 +70,19 @@ var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print version information",
 	Long:  `Print version information`,
-	Run:   runVersion,
+	RunE:  runVersion,
 }
 
 func init() {
 	rootCmd.AddCommand(versionCmd)
 }
 
-func logVersion() {
+func runVersion(cmd *cobra.Command, args []string) error {
 	initBuild()
-	log.Info().Msgf("Runner Version: %s-%s", build.OpslevelVersion.Version, build.OpslevelVersion.Commit)
-}
-
-func printVersion() {
-	initBuild()
-	versionInfo, _ := json.MarshalIndent(build, "", "  ")
+	versionInfo, err := json.MarshalIndent(build, "", "    ")
+	if err != nil {
+		return err
+	}
 	fmt.Println(string(versionInfo))
-}
-
-func runVersion(cmd *cobra.Command, args []string) {
-	printVersion()
+	return nil
 }
