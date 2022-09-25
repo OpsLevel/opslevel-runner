@@ -1,3 +1,0 @@
-kind: Bugfix
-body: use correct config vars for pod log max size and interval
-time: 2022-09-21T23:29:28.561557-05:00

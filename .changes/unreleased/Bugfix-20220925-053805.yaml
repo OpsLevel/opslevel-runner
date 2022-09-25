@@ -1,4 +1,0 @@
-kind: Bugfix
-body: Have multiline outcome var skip capturing bash command log lines when `set -xv`
-  is enabled
-time: 2022-09-25T05:38:05.241003-05:00
