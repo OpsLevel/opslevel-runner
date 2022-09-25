@@ -86,7 +86,7 @@ func jobWorker(wg *sync.WaitGroup, index int, runnerId string, jobQueue <-chan o
 	client := getClientGQL()
 	tracer := pkg.GetTracer()
 	podConfig := newJobPodConfig()
-	runner, err := pkg.NewJobRunner(logger, podConfig)
+	runner, err := pkg.NewJobRunner(runnerId, logger, podConfig)
 	pkg.CheckErr(err)
 
 	logger.Info().Msgf("Starting job processor %d ...", index)

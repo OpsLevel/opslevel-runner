@@ -30,6 +30,26 @@ func TestSetOutcomeVarLogProcessor(t *testing.T) {
 }`, p.vars["multi-var-name"])
 }
 
+func TestMultilineOutcomeVarLogProcessorSkipsBashCommands(t *testing.T) {
+	// Arrange
+	p := NewSetOutcomeVarLogProcessor(nil, log.Logger, "1", "1", "1")
+	// Act
+	p.Process("+ echo ::start-multiline-outcome-var multi-var-name")
+	p.Process("::start-multiline-outcome-var multi-var-name")
+	p.Process("{")
+	p.Process("  \"hello\":\"world\",")
+	p.Process("  \"foo\":\"bar\"")
+	p.Process("}")
+	p.Process("+ echo ::end-multiline-outcome-var")
+	p.Process("::end-multiline-outcome-var")
+	// Assert
+	autopilot.Equals(t, 1, len(p.vars))
+	autopilot.Equals(t, `{
+  "hello":"world",
+  "foo":"bar"
+}`, p.vars["multi-var-name"])
+}
+
 func TestMultilineMissingKeyOutcomeVarLogProcessor(t *testing.T) {
 	// Arrange
 	p := NewSetOutcomeVarLogProcessor(nil, log.Logger, "1", "1", "1")

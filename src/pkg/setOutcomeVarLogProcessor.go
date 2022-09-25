@@ -9,6 +9,7 @@ import (
 	"strings"
 )
 
+var skipCapture = regexp.MustCompile(`^\+\s.*$`)
 var setOutcomeVarExp = regexp.MustCompile(`^::set-outcome-var\s(?P<Key>[\w-]+)=(?P<Value>.*)`)
 var startOutcomeVarExp = regexp.MustCompile(`^::start-multiline-outcome-var\s(?P<Key>[\w-]+)`)
 var endOutcomeVarExp = regexp.MustCompile(`^::end-multiline-outcome-var`)
@@ -36,6 +37,9 @@ func NewSetOutcomeVarLogProcessor(client *opslevel.Client, logger zerolog.Logger
 }
 
 func (s *SetOutcomeVarLogProcessor) Process(line string) string {
+	if skipCapture.MatchString(line) {
+		return line
+	}
 	// This is like a poor man's state machine
 	startOutcomeData := startOutcomeVarExp.FindStringSubmatch(line)
 	if len(startOutcomeData) > 0 {

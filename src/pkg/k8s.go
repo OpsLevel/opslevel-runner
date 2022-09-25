@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"k8s.io/apimachinery/pkg/util/intstr"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
@@ -33,6 +36,7 @@ type JobConfig struct {
 }
 
 type JobRunner struct {
+	runnerId     string
 	logger       zerolog.Logger
 	config       *rest.Config
 	clientset    *kubernetes.Clientset
@@ -53,7 +57,7 @@ type JobPodConfig struct {
 	MemLimit    int64 //in MB
 }
 
-func NewJobRunner(logger zerolog.Logger, jobPodConfig JobPodConfig) (*JobRunner, error) {
+func NewJobRunner(runnerId string, logger zerolog.Logger, jobPodConfig JobPodConfig) (*JobRunner, error) {
 	config, err := getKubernetesConfig()
 	if err != nil {
 		return nil, err
@@ -63,6 +67,7 @@ func NewJobRunner(logger zerolog.Logger, jobPodConfig JobPodConfig) (*JobRunner,
 		return nil, err
 	}
 	return &JobRunner{
+		runnerId:     runnerId,
 		logger:       logger,
 		config:       config,
 		clientset:    clientset,
@@ -96,12 +101,26 @@ func (s *JobRunner) getConfigMapObject(identifier string, job opslevel.RunnerJob
 	}
 }
 
+func (s *JobRunner) getPBDObject(identifier string, selector *metav1.LabelSelector) *policyv1.PodDisruptionBudget {
+	maxUnavailable := intstr.Parse("0")
+	return &policyv1.PodDisruptionBudget{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      identifier,
+			Namespace: s.jobPodConfig.Namespace,
+		},
+		Spec: policyv1.PodDisruptionBudgetSpec{
+			MaxUnavailable: &maxUnavailable,
+			Selector:       selector,
+		},
+	}
+}
+
 func executable() *int32 {
 	value := int32(511)
 	return &value
 }
 
-func (s *JobRunner) getPodObject(identifier string, job opslevel.RunnerJob) *corev1.Pod {
+func (s *JobRunner) getPodObject(identifier string, labels map[string]string, job opslevel.RunnerJob) *corev1.Pod {
 	// TODO: Allow configuration of PullPolicy
 	// TODO: Allow configuration of Labels
 	// TODO: Allow configuration of Annotations
@@ -111,6 +130,7 @@ func (s *JobRunner) getPodObject(identifier string, job opslevel.RunnerJob) *cor
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      identifier,
 			Namespace: s.jobPodConfig.Namespace,
+			Labels:    labels,
 		},
 		Spec: corev1.PodSpec{
 			TerminationGracePeriodSeconds: &[]int64{5}[0],
@@ -127,11 +147,11 @@ func (s *JobRunner) getPodObject(identifier string, job opslevel.RunnerJob) *cor
 					Resources: corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
 							corev1.ResourceCPU:    *resource.NewMilliQuantity(s.jobPodConfig.CpuRequests, resource.DecimalSI),
-							corev1.ResourceMemory: *resource.NewQuantity(s.jobPodConfig.MemRequests, resource.BinarySI),
+							corev1.ResourceMemory: *resource.NewQuantity(s.jobPodConfig.MemRequests*1024*1024, resource.BinarySI),
 						},
 						Limits: corev1.ResourceList{
 							corev1.ResourceCPU:    *resource.NewMilliQuantity(s.jobPodConfig.CpuLimit, resource.DecimalSI),
-							corev1.ResourceMemory: *resource.NewQuantity(s.jobPodConfig.MemLimit, resource.BinarySI),
+							corev1.ResourceMemory: *resource.NewQuantity(s.jobPodConfig.MemLimit*1024*1204, resource.BinarySI),
 						},
 					},
 					Env: s.getPodEnv(job.Variables),
@@ -165,23 +185,45 @@ func (s *JobRunner) getPodObject(identifier string, job opslevel.RunnerJob) *cor
 func (s *JobRunner) Run(job opslevel.RunnerJob, stdout, stderr *SafeBuffer) JobOutcome {
 	id := job.Id.(string)
 	identifier := fmt.Sprintf("opslevel-job-%s-%d", job.Number(), time.Now().Unix())
-	// TODO: manage pods based on image for re-use?
-	cfgMap, cfgMapErr := s.CreateConfigMap(s.getConfigMapObject(identifier, job))
-	if cfgMapErr != nil {
+	runnerIdentifier := fmt.Sprintf("runner-%s", s.runnerId)
+	labels := map[string]string{
+		"app.kubernetes.io/instance":   identifier,
+		"app.kubernetes.io/managed-by": runnerIdentifier,
+	}
+	labelSelector, err := CreateLabelSelector(labels)
+	if err != nil {
 		return JobOutcome{
-			Message: fmt.Sprintf("failed to create configmap REASON: %s", cfgMapErr),
+			Message: fmt.Sprintf("failed to create label selector REASON: %s", err),
+			Outcome: opslevel.RunnerJobOutcomeEnumFailed,
+		}
+	}
+	// TODO: manage pods based on image for re-use?
+	cfgMap, err := s.CreateConfigMap(s.getConfigMapObject(identifier, job))
+	if err != nil {
+		return JobOutcome{
+			Message: fmt.Sprintf("failed to create configmap REASON: %s", err),
 			Outcome: opslevel.RunnerJobOutcomeEnumFailed,
 		}
 	}
 
-	// NOTE: do not use cobra.CheckErr after this point because this defer will never happen because os.Exit(1)
 	// TODO: if we reuse pods then delete should not happen?
 	defer s.DeleteConfigMap(cfgMap)
 
-	pod, podErr := s.CreatePod(s.getPodObject(identifier, job))
-	if podErr != nil {
+	pdb, err := s.CreatePDB(s.getPBDObject(identifier, labelSelector))
+	if err != nil {
 		return JobOutcome{
-			Message: fmt.Sprintf("failed to create pod REASON: %s", podErr),
+			Message: fmt.Sprintf("failed to create pod disruption budget REASON: %s", err),
+			Outcome: opslevel.RunnerJobOutcomeEnumFailed,
+		}
+	}
+
+	// TODO: if we reuse pods then delete should not happen?
+	defer s.DeletePDB(pdb)
+
+	pod, err := s.CreatePod(s.getPodObject(identifier, labels, job))
+	if err != nil {
+		return JobOutcome{
+			Message: fmt.Sprintf("failed to create pod REASON: %s", err),
 			Outcome: opslevel.RunnerJobOutcomeEnumFailed,
 		}
 	}
@@ -199,9 +241,6 @@ func (s *JobRunner) Run(job opslevel.RunnerJob, stdout, stderr *SafeBuffer) JobO
 		}
 	}
 
-	// // TODO: this log streamer should probably be used for All "job" logging to capture errors
-	//writer := NewOpsLevelLogWriter(s.index, time.Second*time.Duration(viper.GetInt("pod-log-max-interval")), viper.GetInt("pod-log-max-size"))
-
 	working_directory := fmt.Sprintf("/jobs/%s/", id)
 	commands := append([]string{fmt.Sprintf("mkdir -p %s", working_directory), fmt.Sprintf("cd %s", working_directory), "set -xv"}, job.Commands...)
 	runErr := s.Exec(stdout, stderr, pod, pod.Spec.Containers[0].Name, viper.GetString("pod-shell"), "-e", "-c", strings.Join(commands, ";\n"))
@@ -212,13 +251,19 @@ func (s *JobRunner) Run(job opslevel.RunnerJob, stdout, stderr *SafeBuffer) JobO
 		}
 	}
 
-	// // we need to flush the writer when the job is over - not sure this is the best way
-	//writer.Emit()
-
 	return JobOutcome{
 		Message: "",
 		Outcome: opslevel.RunnerJobOutcomeEnumSuccess,
 	}
+}
+
+func CreateLabelSelector(labels map[string]string) (*metav1.LabelSelector, error) {
+	var selectors []string
+	for key, value := range labels {
+		selectors = append(selectors, fmt.Sprintf("%s=%s", key, value))
+	}
+	labelSelector, err := metav1.ParseToLabelSelector(strings.Join(selectors, ","))
+	return labelSelector, err
 }
 
 func getKubernetesClientset() (*kubernetes.Clientset, error) {
@@ -245,7 +290,6 @@ func getKubernetesConfig() (*rest.Config, error) {
 }
 
 func (s *JobRunner) ExecWithConfig(config JobConfig) error {
-
 	req := s.clientset.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(config.PodName).
@@ -286,14 +330,19 @@ func (s *JobRunner) Exec(stdout, stderr *SafeBuffer, pod *corev1.Pod, containerN
 	})
 }
 
-func (s *JobRunner) CreateConfigMap(configMapConfig *corev1.ConfigMap) (*corev1.ConfigMap, error) {
-	s.logger.Trace().Msgf("Creating configmap %s/%s ...", configMapConfig.Namespace, configMapConfig.Name)
-	return s.clientset.CoreV1().ConfigMaps(configMapConfig.Namespace).Create(context.TODO(), configMapConfig, metav1.CreateOptions{})
+func (s *JobRunner) CreateConfigMap(config *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+	s.logger.Trace().Msgf("Creating configmap %s/%s ...", config.Namespace, config.Name)
+	return s.clientset.CoreV1().ConfigMaps(config.Namespace).Create(context.TODO(), config, metav1.CreateOptions{})
 }
 
-func (s *JobRunner) CreatePod(podConfig *corev1.Pod) (*corev1.Pod, error) {
-	s.logger.Trace().Msgf("Creating pod %s/%s ...", podConfig.Namespace, podConfig.Name)
-	return s.clientset.CoreV1().Pods(podConfig.Namespace).Create(context.TODO(), podConfig, metav1.CreateOptions{})
+func (s *JobRunner) CreatePDB(config *policyv1.PodDisruptionBudget) (*policyv1.PodDisruptionBudget, error) {
+	s.logger.Trace().Msgf("Creating pod disruption budget %s/%s ...", config.Namespace, config.Name)
+	return s.clientset.PolicyV1().PodDisruptionBudgets(config.Namespace).Create(context.TODO(), config, metav1.CreateOptions{})
+}
+
+func (s *JobRunner) CreatePod(config *corev1.Pod) (*corev1.Pod, error) {
+	s.logger.Trace().Msgf("Creating pod %s/%s ...", config.Namespace, config.Name)
+	return s.clientset.CoreV1().Pods(config.Namespace).Create(context.TODO(), config, metav1.CreateOptions{})
 }
 
 func (s *JobRunner) WaitForPod(podConfig *corev1.Pod, timeout time.Duration) error {
@@ -313,12 +362,17 @@ func (s *JobRunner) WaitForPod(podConfig *corev1.Pod, timeout time.Duration) err
 	})
 }
 
-func (s *JobRunner) DeleteConfigMap(configMapConfig *corev1.ConfigMap) error {
-	s.logger.Trace().Msgf("Deleting configmap %s/%s ...", configMapConfig.Namespace, configMapConfig.Name)
-	return s.clientset.CoreV1().ConfigMaps(configMapConfig.Namespace).Delete(context.TODO(), configMapConfig.Name, metav1.DeleteOptions{})
+func (s *JobRunner) DeleteConfigMap(config *corev1.ConfigMap) error {
+	s.logger.Trace().Msgf("Deleting configmap %s/%s ...", config.Namespace, config.Name)
+	return s.clientset.CoreV1().ConfigMaps(config.Namespace).Delete(context.TODO(), config.Name, metav1.DeleteOptions{})
 }
 
-func (s *JobRunner) DeletePod(podConfig *corev1.Pod) error {
-	s.logger.Trace().Msgf("Deleting pod %s/%s ...", podConfig.Namespace, podConfig.Name)
-	return s.clientset.CoreV1().Pods(podConfig.Namespace).Delete(context.TODO(), podConfig.Name, metav1.DeleteOptions{})
+func (s *JobRunner) DeletePDB(config *policyv1.PodDisruptionBudget) error {
+	s.logger.Trace().Msgf("Deleting configmap %s/%s ...", config.Namespace, config.Name)
+	return s.clientset.PolicyV1().PodDisruptionBudgets(config.Namespace).Delete(context.TODO(), config.Name, metav1.DeleteOptions{})
+}
+
+func (s *JobRunner) DeletePod(config *corev1.Pod) error {
+	s.logger.Trace().Msgf("Deleting pod %s/%s ...", config.Namespace, config.Name)
+	return s.clientset.CoreV1().Pods(config.Namespace).Delete(context.TODO(), config.Name, metav1.DeleteOptions{})
 }
