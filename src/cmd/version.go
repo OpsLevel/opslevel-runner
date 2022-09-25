@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/rs/zerolog/log"
 	"runtime"
 
 	"github.com/spf13/cobra"
@@ -75,6 +76,11 @@ var versionCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(versionCmd)
+}
+
+func logVersion() {
+	initBuild()
+	log.Info().Msgf("Runner Version: %s-%s", build.OpslevelVersion.Version, build.OpslevelVersion.Commit)
 }
 
 func runVersion(cmd *cobra.Command, args []string) error {

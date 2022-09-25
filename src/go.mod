@@ -4,8 +4,9 @@ go 1.18
 
 require (
 	github.com/getsentry/sentry-go v0.13.0
+	github.com/go-resty/resty/v2 v2.7.0
 	github.com/opslevel/opslevel-common/v2022 v2022.6.28
-	github.com/opslevel/opslevel-go/v2022 v2022.0.0-00010101000000-000000000000
+	github.com/opslevel/opslevel-go/v2022 v2022.8.25
 	github.com/prometheus/client_golang v1.12.2
 	github.com/rocktavious/autopilot v0.1.5
 	github.com/rs/zerolog v1.27.0
@@ -39,7 +40,6 @@ require (
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/jsonreference v0.19.5 // indirect
 	github.com/go-openapi/swag v0.19.14 // indirect
-	github.com/go-resty/resty/v2 v2.7.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/gnostic v0.5.7-v3refs // indirect
@@ -95,4 +95,4 @@ require (
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )
 
-replace github.com/opslevel/opslevel-go/v2022 => ./submodules/opslevel-go
+// replace github.com/opslevel/opslevel-go/v2022 => ./submodules/opslevel-go

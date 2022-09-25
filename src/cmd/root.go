@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/getsentry/sentry-go"
+	"github.com/go-resty/resty/v2"
 	"github.com/opslevel/opslevel-go/v2022"
 	"os"
 	"strings"
@@ -139,7 +140,15 @@ func setupSentry(dsn string) {
 	}
 }
 
+var _clientRest *resty.Client
 var _clientGQL *opslevel.Client
+
+func getClientRest() *resty.Client {
+	if _clientRest == nil {
+		_clientRest = opslevel.NewRestClient(opslevel.SetURL(viper.GetString("api-url")))
+	}
+	return _clientRest
+}
 
 func getClientGQL() *opslevel.Client {
 	if _clientGQL == nil {
