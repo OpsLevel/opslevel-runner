@@ -1,0 +1,3 @@
+kind: Refactor
+body: Log error message when Sentry isn't configured
+time: 2022-10-05T20:36:36.541168-05:00
