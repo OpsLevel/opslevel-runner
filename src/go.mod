@@ -12,8 +12,8 @@ require (
 	github.com/rs/zerolog v1.27.0
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/viper v1.8.1
-	go.opentelemetry.io/otel v1.8.0
-	go.opentelemetry.io/otel/trace v1.8.0
+	go.opentelemetry.io/otel v1.11.0
+	go.opentelemetry.io/otel/trace v1.11.0
 	k8s.io/api v0.24.2
 	k8s.io/apimachinery v0.24.2
 	k8s.io/client-go v0.24.2
