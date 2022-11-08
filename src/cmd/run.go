@@ -9,6 +9,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
+	clientset "k8s.io/client-go/kubernetes"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -46,6 +48,11 @@ func doRun(cmd *cobra.Command, args []string) {
 	runner, err := client.RunnerRegister()
 	pkg.CheckErr(err)
 
+	if viper.GetBool("scaling-enabled") {
+		log.Info().Msgf("electing leader...")
+		electLeader()
+	}
+
 	log.Info().Msgf("Starting runner for id '%s'", runner.Id)
 	pkg.StartMetricsServer(runner.Id.(string), viper.GetInt("metrics-port"))
 	stop := opslevel_common.InitSignalHandler()
@@ -55,6 +62,26 @@ func doRun(cmd *cobra.Command, args []string) {
 	wg.Wait()
 	log.Info().Msgf("Unregister runner for id '%s'...", runner.Id)
 	client.RunnerUnregister(&runner.Id)
+}
+
+func electLeader() {
+	leaseLockName := "opslevel-runner-leader-lock"
+	leaseLockNamespace := viper.GetString("pod-namespace")
+	podName := os.Getenv("POD_NAME")
+
+	config, err := pkg.GetKubernetesConfig()
+
+	if err != nil {
+		log.Info().Msgf("Failed to get kubeconfig")
+	}
+
+	clientset.NewForConfigOrDie(config)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	lock := pkg.GetNewLock(leaseLockName, podName, leaseLockNamespace)
+	pkg.RunLeaderElection(lock, ctx, podName)
 }
 
 func startWorkers(runnerId string, stop <-chan struct{}) *sync.WaitGroup {

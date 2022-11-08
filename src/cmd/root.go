@@ -36,6 +36,7 @@ func init() {
 	rootCmd.PersistentFlags().String("api-token", "", "The OpsLevel API Token. Overrides environment variable 'OPSLEVEL_API_TOKEN'")
 	rootCmd.PersistentFlags().String("log-format", "TEXT", "overrides environment variable 'OPSLEVEL_LOG_FORMAT' (options [\"JSON\", \"TEXT\"])")
 	rootCmd.PersistentFlags().String("log-level", "INFO", "overrides environment variable 'OPSLEVEL_LOG_LEVEL' (options [\"ERROR\", \"WARN\", \"INFO\", \"DEBUG\"])")
+	rootCmd.PersistentFlags().Bool("scaling-enabled", false, "Enables built-in pod scaling for kubernetes environment, defaults to false for local development")
 
 	rootCmd.PersistentFlags().Int("pod-max-wait", 60, "The max amount of time to wait for the job pod to become healthy.")
 	rootCmd.PersistentFlags().Int("job-pod-max-lifetime", 3600, "The max amount of time a job pod can run for.")
@@ -59,6 +60,7 @@ func init() {
 	viper.BindEnv("pod-shell", "OPSLEVEL_POD_SHELL")
 	viper.BindEnv("pod-log-max-interval", "OPSLEVEL_POD_LOG_MAX_INTERVAL")
 	viper.BindEnv("pod-log-max-size", "OPSLEVEL_POD_LOG_MAX_SIZE")
+	viper.BindEnv("scaling-enabled", "SCALING_ENABLED")
 	cobra.OnInitialize(initConfig)
 }
 
