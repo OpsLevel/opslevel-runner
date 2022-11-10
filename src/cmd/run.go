@@ -10,10 +10,6 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 	clientset "k8s.io/client-go/kubernetes"
-<<<<<<< HEAD
-=======
-	"os"
->>>>>>> d098d72 (Adding leader election code to test out in dev)
 	"strings"
 	"sync"
 	"time"
