@@ -57,6 +57,7 @@ func init() {
 	viper.BindEnv("pod-max-wait", "OPSLEVEL_POD_MAX_WAIT")
 	viper.BindEnv("job-pod-max-lifetime", "OPSLEVEL_JOB_POD_MAX_LIFETIME")
 	viper.BindEnv("pod-namespace", "OPSLEVEL_POD_NAMESPACE")
+	viper.BindEnv("pod-name", "POD_NAME")
 	viper.BindEnv("pod-shell", "OPSLEVEL_POD_SHELL")
 	viper.BindEnv("pod-log-max-interval", "OPSLEVEL_POD_LOG_MAX_INTERVAL")
 	viper.BindEnv("pod-log-max-size", "OPSLEVEL_POD_LOG_MAX_SIZE")
