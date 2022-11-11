@@ -9,9 +9,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"strings"
 	"sync"
 	"time"
@@ -27,10 +25,6 @@ import (
 var runCmd = &cobra.Command{
 	Use: "run",
 	Run: doRun,
-}
-
-type k8sClientset struct {
-	client *clientset.Clientset
 }
 
 func init() {
@@ -55,7 +49,7 @@ func doRun(cmd *cobra.Command, args []string) {
 
 	if viper.GetBool("scaling-enabled") {
 		log.Info().Msgf("electing leader...")
-		electLeader()
+		go electLeader()
 	}
 
 	log.Info().Msgf("Starting runner for id '%s'", runner.Id)
@@ -70,38 +64,19 @@ func doRun(cmd *cobra.Command, args []string) {
 }
 
 func electLeader() {
-	leaseLockName := "opslevel-runner-leader-lock"
-	leaseLockNamespace := viper.GetString("pod-namespace")
-	podName := viper.GetString("pod-name")
+	leaseLockName := viper.GetString("runner-deployment")
+	leaseLockNamespace := viper.GetString("runner-pod-namespace")
+	lockIdentity := viper.GetString("runner-pod-name")
 
 	config, err := pkg.GetKubernetesConfig()
+	pkg.CheckErr(err)
 
-	if err != nil {
-		log.Info().Msgf("Failed to get kubeconfig")
-	}
-
-	client := k8sClientset{
-		client: clientset.NewForConfigOrDie(config),
-	}
+	client := clientset.NewForConfigOrDie(config)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	lock := client.getNewLock(leaseLockName, podName, leaseLockNamespace)
-	pkg.RunLeaderElection(lock, ctx, podName)
-}
-
-func (c k8sClientset) getNewLock(lockname, podname, namespace string) *resourcelock.LeaseLock {
-	return &resourcelock.LeaseLock{
-		LeaseMeta: metav1.ObjectMeta{
-			Name:      lockname,
-			Namespace: namespace,
-		},
-		Client: c.client.CoordinationV1(),
-		LockConfig: resourcelock.ResourceLockConfig{
-			Identity: podname,
-		},
-	}
+	pkg.RunLeaderElection(client, ctx, leaseLockName, lockIdentity, leaseLockNamespace)
 }
 
 func startWorkers(runnerId string, stop <-chan struct{}) *sync.WaitGroup {

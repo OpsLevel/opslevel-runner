@@ -3,6 +3,8 @@ package pkg
 import (
 	"context"
 	"github.com/rs/zerolog/log"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/leaderelection"
@@ -14,7 +16,17 @@ var (
 	isLeader bool
 )
 
-func RunLeaderElection(lock *resourcelock.LeaseLock, ctx context.Context, id string) {
+func RunLeaderElection(client *clientset.Clientset, ctx context.Context, lockname, id, namespace string) {
+	lock := &resourcelock.LeaseLock{
+		LeaseMeta: metav1.ObjectMeta{
+			Name:      lockname,
+			Namespace: namespace,
+		},
+		Client: client.CoordinationV1(),
+		LockConfig: resourcelock.ResourceLockConfig{
+			Identity: id,
+		},
+	}
 	leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
 		Lock:            lock,
 		ReleaseOnCancel: true,
@@ -33,10 +45,6 @@ func RunLeaderElection(lock *resourcelock.LeaseLock, ctx context.Context, id str
 			},
 			OnStoppedLeading: func() {
 				isLeader = false
-				for {
-					log.Info().Msgf("no longer the leader, staging inactive.")
-					time.Sleep(5 * time.Second)
-				}
 			},
 			OnNewLeader: func(currentId string) {
 				if !isLeader && currentId == id {
@@ -44,9 +52,6 @@ func RunLeaderElection(lock *resourcelock.LeaseLock, ctx context.Context, id str
 					return
 				} else if !isLeader && currentId != id {
 					log.Info().Msgf("leader is %s", currentId)
-				}
-				for {
-					time.Sleep(5 * time.Second)
 				}
 			},
 		},

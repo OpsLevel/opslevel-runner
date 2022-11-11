@@ -38,9 +38,10 @@ func init() {
 	rootCmd.PersistentFlags().String("log-level", "INFO", "overrides environment variable 'OPSLEVEL_LOG_LEVEL' (options [\"ERROR\", \"WARN\", \"INFO\", \"DEBUG\"])")
 	rootCmd.PersistentFlags().Bool("scaling-enabled", false, "Enables built-in pod scaling for kubernetes environment, defaults to false for local development")
 
+	// TODO: Update pod-* flags to job-pod-* to distinguish between job and runner specific values.  Moving this work over to separate ticket since it's a breaking change: https://gitlab.com/jklabsinc/OpsLevel/-/issues/5763
 	rootCmd.PersistentFlags().Int("pod-max-wait", 60, "The max amount of time to wait for the job pod to become healthy.")
 	rootCmd.PersistentFlags().Int("job-pod-max-lifetime", 3600, "The max amount of time a job pod can run for.")
-	rootCmd.PersistentFlags().String("pod-namespace", "default", "The kubernetes namespace to create pods in.")
+	rootCmd.PersistentFlags().String("pod-namespace", "default", "The kubernetes namespace to create job pods in.")
 	rootCmd.PersistentFlags().Int64("pod-requests-cpu", 1000, "Default is in millicores.")
 	rootCmd.PersistentFlags().Int64("pod-requests-memory", 1024, "Pod job resource requests in MB.")
 	rootCmd.PersistentFlags().Int64("pod-limits-cpu", 1000, "Default is in millicores.")
@@ -48,6 +49,9 @@ func init() {
 	rootCmd.PersistentFlags().String("pod-shell", "/bin/sh", "The shell to use for commands inside the pod.")
 	rootCmd.PersistentFlags().Int("pod-log-max-interval", 30, "The max amount of time between when pod logs are shipped to OpsLevel. Works in tandem with 'pod-log-max-size'")
 	rootCmd.PersistentFlags().Int("pod-log-max-size", 1000000, "The max amount in bytes to buffer before pod logs are shipped to OpsLevel. Works in tandem with 'pod-log-max-interval'")
+	rootCmd.PersistentFlags().String("runner-pod-name", "", "overrides environment variable 'RUNNER_POD_NAME'")
+	rootCmd.PersistentFlags().String("runner-pod-namespace", "default", "The kubernetes namespace the runner pod is deployed in.")
+	rootCmd.PersistentFlags().String("runner-deployment", "runner", "The kubernetes namespace the runner pod is deployed in.")
 
 	viper.BindPFlags(rootCmd.PersistentFlags())
 	viper.BindEnv("log-format", "OPSLEVEL_LOG_FORMAT")
@@ -57,7 +61,8 @@ func init() {
 	viper.BindEnv("pod-max-wait", "OPSLEVEL_POD_MAX_WAIT")
 	viper.BindEnv("job-pod-max-lifetime", "OPSLEVEL_JOB_POD_MAX_LIFETIME")
 	viper.BindEnv("pod-namespace", "OPSLEVEL_POD_NAMESPACE")
-	viper.BindEnv("pod-name", "POD_NAME")
+	viper.BindEnv("runner-pod-namespace", "RUNNER_POD_NAMESPACE")
+	viper.BindEnv("runner-pod-name", "RUNNER_POD_NAME")
 	viper.BindEnv("pod-shell", "OPSLEVEL_POD_SHELL")
 	viper.BindEnv("pod-log-max-interval", "OPSLEVEL_POD_LOG_MAX_INTERVAL")
 	viper.BindEnv("pod-log-max-size", "OPSLEVEL_POD_LOG_MAX_SIZE")
