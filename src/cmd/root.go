@@ -50,8 +50,8 @@ func init() {
 	rootCmd.PersistentFlags().Int("pod-log-max-interval", 30, "The max amount of time between when pod logs are shipped to OpsLevel. Works in tandem with 'pod-log-max-size'")
 	rootCmd.PersistentFlags().Int("pod-log-max-size", 1000000, "The max amount in bytes to buffer before pod logs are shipped to OpsLevel. Works in tandem with 'pod-log-max-interval'")
 	rootCmd.PersistentFlags().String("runner-pod-name", "", "overrides environment variable 'RUNNER_POD_NAME'")
-	rootCmd.PersistentFlags().String("runner-pod-namespace", "default", "The kubernetes namespace the runner pod is deployed in.")
-	rootCmd.PersistentFlags().String("runner-deployment", "runner", "The kubernetes namespace the runner pod is deployed in.")
+	rootCmd.PersistentFlags().String("runner-pod-namespace", "default", "The kubernetes namespace the runner pod is deployed in. Overrides environment variable 'RUNNER_POD_NAMESPACE'")
+	rootCmd.PersistentFlags().String("runner-deployment", "runner", "The runner's kubernetes deployment name")
 
 	viper.BindPFlags(rootCmd.PersistentFlags())
 	viper.BindEnv("log-format", "OPSLEVEL_LOG_FORMAT")

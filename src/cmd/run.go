@@ -48,8 +48,13 @@ func doRun(cmd *cobra.Command, args []string) {
 	pkg.CheckErr(err)
 
 	if viper.GetBool("scaling-enabled") {
+		config, err := pkg.GetKubernetesConfig()
+		pkg.CheckErr(err)
+
+		client := clientset.NewForConfigOrDie(config)
+
 		log.Info().Msgf("electing leader...")
-		go electLeader()
+		go electLeader(client)
 	}
 
 	log.Info().Msgf("Starting runner for id '%s'", runner.Id)
@@ -63,20 +68,12 @@ func doRun(cmd *cobra.Command, args []string) {
 	client.RunnerUnregister(&runner.Id)
 }
 
-func electLeader() {
+func electLeader(client *clientset.Clientset) {
 	leaseLockName := viper.GetString("runner-deployment")
 	leaseLockNamespace := viper.GetString("runner-pod-namespace")
 	lockIdentity := viper.GetString("runner-pod-name")
 
-	config, err := pkg.GetKubernetesConfig()
-	pkg.CheckErr(err)
-
-	client := clientset.NewForConfigOrDie(config)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	pkg.RunLeaderElection(client, ctx, leaseLockName, lockIdentity, leaseLockNamespace)
+	pkg.RunLeaderElection(client, leaseLockName, lockIdentity, leaseLockNamespace)
 }
 
 func startWorkers(runnerId string, stop <-chan struct{}) *sync.WaitGroup {

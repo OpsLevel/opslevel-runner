@@ -16,17 +16,21 @@ var (
 	isLeader bool
 )
 
-func RunLeaderElection(client *clientset.Clientset, ctx context.Context, lockname, id, namespace string) {
+func RunLeaderElection(client *clientset.Clientset, lockName, lockIdentity, lockNamespace string) {
 	lock := &resourcelock.LeaseLock{
 		LeaseMeta: metav1.ObjectMeta{
-			Name:      lockname,
-			Namespace: namespace,
+			Name:      lockName,
+			Namespace: lockNamespace,
 		},
 		Client: client.CoordinationV1(),
 		LockConfig: resourcelock.ResourceLockConfig{
-			Identity: id,
+			Identity: lockIdentity,
 		},
 	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
 		Lock:            lock,
 		ReleaseOnCancel: true,
@@ -38,7 +42,7 @@ func RunLeaderElection(client *clientset.Clientset, ctx context.Context, locknam
 				isLeader = true
 				log.Info().Msgf("Perform Migration")
 				for {
-					log.Info().Msgf("leader is %s", id)
+					log.Info().Msgf("leader is %s", lockIdentity)
 					log.Info().Msgf("Getting replica count...")
 					time.Sleep(5 * time.Second)
 				}
@@ -47,10 +51,10 @@ func RunLeaderElection(client *clientset.Clientset, ctx context.Context, locknam
 				isLeader = false
 			},
 			OnNewLeader: func(currentId string) {
-				if !isLeader && currentId == id {
+				if !isLeader && currentId == lockIdentity {
 					log.Info().Msgf("%s started leading!", currentId)
 					return
-				} else if !isLeader && currentId != id {
+				} else if !isLeader && currentId != lockIdentity {
 					log.Info().Msgf("leader is %s", currentId)
 				}
 			},
