@@ -9,6 +9,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
+	"k8s.io/client-go/util/retry"
 	"time"
 )
 
@@ -43,8 +44,26 @@ func RunLeaderElection(client *clientset.Clientset, lockName, lockIdentity, lock
 				log.Info().Msgf("Perform Migration")
 				for {
 					log.Info().Msgf("leader is %s", lockIdentity)
-					log.Info().Msgf("Getting replica count...")
-					time.Sleep(5 * time.Second)
+					replicaCount, err := getReplicas()
+					if err != nil {
+						log.Fatal().Msgf("Failed to get replica count")
+					}
+					log.Info().Msgf("Setting replica count to %v", replicaCount)
+					retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+						deploymentsClient := client.AppsV1().Deployments(lockNamespace)
+						result, getErr := deploymentsClient.Get(context.TODO(), lockName, metav1.GetOptions{})
+						if getErr != nil {
+							log.Fatal().Msgf("Failed to get latest version of Deployment: %v", getErr)
+						}
+						result.Spec.Replicas = &replicaCount
+						_, updateErr := deploymentsClient.Update(context.TODO(), result, metav1.UpdateOptions{})
+						return updateErr
+					})
+					if retryErr != nil {
+						log.Fatal().Msgf("Failed to set replica count: %v", retryErr)
+					}
+					log.Info().Msgf("Successfully set replicas to %v", replicaCount)
+					time.Sleep(60 * time.Second)
 				}
 			},
 			OnStoppedLeading: func() {
@@ -60,6 +79,10 @@ func RunLeaderElection(client *clientset.Clientset, lockName, lockIdentity, lock
 			},
 		},
 	})
+}
+
+func getReplicas() (int32, error) {
+	return int32(1), nil
 }
 
 func GetKubernetesConfig() (*rest.Config, error) {
