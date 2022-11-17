@@ -1,0 +1,4 @@
+kind: Bugfix
+body: Fixes a problem where stderr lines sometimes end up in multiline outcome vars
+  inadvertantly
+time: 2022-11-17T14:20:26.775712-06:00

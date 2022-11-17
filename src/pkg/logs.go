@@ -8,7 +8,8 @@ import (
 )
 
 type LogProcessor interface {
-	Process(line string) string
+	ProcessStdout(line string) string
+	ProcessStderr(line string) string
 	Flush(outcome JobOutcome)
 }
 
@@ -60,7 +61,7 @@ func (s *LogStreamer) Run() {
 				if err == nil {
 					line = strings.TrimSuffix(line, "\n")
 					for _, processor := range s.processors {
-						line = processor.Process(line)
+						line = processor.ProcessStderr(line)
 					}
 					s.logBuffer.Value = line
 					s.logBuffer = s.logBuffer.Next()
@@ -71,7 +72,7 @@ func (s *LogStreamer) Run() {
 				if err == nil {
 					line = strings.TrimSuffix(line, "\n")
 					for _, processor := range s.processors {
-						line = processor.Process(line)
+						line = processor.ProcessStdout(line)
 					}
 					s.logBuffer.Value = line
 					s.logBuffer = s.logBuffer.Next()

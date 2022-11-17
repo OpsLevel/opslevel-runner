@@ -69,6 +69,15 @@ func (s *SetOutcomeVarLogProcessor) Process(line string) string {
 	return line
 }
 
+func (s *SetOutcomeVarLogProcessor) ProcessStdout(line string) string {
+	return s.Process(line)
+}
+
+func (s *SetOutcomeVarLogProcessor) ProcessStderr(line string) string {
+	// We don't want to process stderr lines as they will never contain outcome var data
+	return line
+}
+
 func (s *SetOutcomeVarLogProcessor) Flush(outcome JobOutcome) {
 	vars := []opslevel.RunnerJobOutcomeVariable{}
 	for k, v := range s.vars {

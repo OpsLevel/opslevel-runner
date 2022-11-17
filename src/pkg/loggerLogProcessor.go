@@ -21,4 +21,12 @@ func (s *LoggerLogProcessor) Process(line string) string {
 	return line
 }
 
+func (s *LoggerLogProcessor) ProcessStdout(line string) string {
+	return s.Process(line)
+}
+
+func (s *LoggerLogProcessor) ProcessStderr(line string) string {
+	return s.Process(line)
+}
+
 func (s *LoggerLogProcessor) Flush(outcome JobOutcome) {}

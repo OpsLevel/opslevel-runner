@@ -66,6 +66,14 @@ func (s *OpsLevelAppendLogProcessor) Process(line string) string {
 	return line
 }
 
+func (s *OpsLevelAppendLogProcessor) ProcessStdout(line string) string {
+	return s.Process(line)
+}
+
+func (s *OpsLevelAppendLogProcessor) ProcessStderr(line string) string {
+	return s.Process(line)
+}
+
 func (s *OpsLevelAppendLogProcessor) Flush(outcome JobOutcome) {
 	if len(s.logLines) > 0 {
 		s.logger.Trace().Msg("Sleeping before append job logs ...")
