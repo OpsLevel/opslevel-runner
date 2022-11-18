@@ -1,0 +1,3 @@
+kind: Refactor
+body: Split log processor so we can handle stdout differently then stderr
+time: 2022-11-17T14:20:00.191208-06:00
