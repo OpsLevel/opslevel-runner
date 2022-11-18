@@ -51,6 +51,7 @@ type JobOutcome struct {
 
 type JobPodConfig struct {
 	Namespace   string
+	Lifetime    int   //in seconds
 	CpuRequests int64 //in millicores!
 	MemRequests int64 //in MB
 	CpuLimit    int64 //in millicores!
@@ -142,7 +143,7 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 					Command: []string{
 						"/bin/sh",
 						"-c",
-						"while :; do sleep 30; done",
+						fmt.Sprintf("sleep %d", s.jobPodConfig.Lifetime),
 					},
 					Resources: corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
