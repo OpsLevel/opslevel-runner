@@ -38,6 +38,7 @@ func init() {
 	rootCmd.PersistentFlags().String("log-level", "INFO", "overrides environment variable 'OPSLEVEL_LOG_LEVEL' (options [\"ERROR\", \"WARN\", \"INFO\", \"DEBUG\"])")
 
 	rootCmd.PersistentFlags().Int("pod-max-wait", 60, "The max amount of time to wait for the job pod to become healthy.")
+	rootCmd.PersistentFlags().Int("job-pod-max-lifetime", 3600, "The max amount of time a job pod can run for.")
 	rootCmd.PersistentFlags().String("pod-namespace", "default", "The kubernetes namespace to create pods in.")
 	rootCmd.PersistentFlags().Int64("pod-requests-cpu", 1000, "Default is in millicores.")
 	rootCmd.PersistentFlags().Int64("pod-requests-memory", 1024, "Pod job resource requests in MB.")
@@ -53,6 +54,7 @@ func init() {
 	viper.BindEnv("api-url", "OPSLEVEL_API_URL", "OPSLEVEL_APP_URL")
 	viper.BindEnv("api-token", "OPSLEVEL_API_TOKEN")
 	viper.BindEnv("pod-max-wait", "OPSLEVEL_POD_MAX_WAIT")
+	viper.BindEnv("job-pod-max-lifetime", "OPSLEVEL_JOB_POD_MAX_LIFETIME")
 	viper.BindEnv("pod-namespace", "OPSLEVEL_POD_NAMESPACE")
 	viper.BindEnv("pod-shell", "OPSLEVEL_POD_SHELL")
 	viper.BindEnv("pod-log-max-interval", "OPSLEVEL_POD_LOG_MAX_INTERVAL")
@@ -63,6 +65,7 @@ func init() {
 func newJobPodConfig() pkg.JobPodConfig {
 	return pkg.JobPodConfig{
 		Namespace:   viper.GetString("pod-namespace"),
+		Lifetime:    viper.GetInt("job-pod-max-lifetime"),
 		CpuRequests: viper.GetInt64("pod-requests-cpu"),
 		MemRequests: viper.GetInt64("pod-requests-memory"),
 		CpuLimit:    viper.GetInt64("pod-limits-cpu"),
