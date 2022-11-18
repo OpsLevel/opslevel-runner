@@ -46,23 +46,31 @@ func RunLeaderElection(client *clientset.Clientset, lockName, lockIdentity, lock
 					log.Info().Msgf("leader is %s", lockIdentity)
 					replicaCount, err := getReplicas()
 					if err != nil {
-						log.Fatal().Msgf("Failed to get replica count")
+						log.Info().Msgf("Failed to get replica count: %v", err)
+						continue
 					}
 					log.Info().Msgf("Setting replica count to %v", replicaCount)
+					// Retry is being used below to prevent deployment update from overwriting a
+					// separate and unrelated update action per client-go's recommendation:
+					// https://github.com/kubernetes/client-go/blob/master/examples/create-update-delete-deployment/main.go#L117
 					retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 						deploymentsClient := client.AppsV1().Deployments(lockNamespace)
 						result, getErr := deploymentsClient.Get(context.TODO(), lockName, metav1.GetOptions{})
 						if getErr != nil {
-							log.Fatal().Msgf("Failed to get latest version of Deployment: %v", getErr)
+							log.Info().Msgf("Failed to get latest version of Deployment: %v", getErr)
+							return getErr
 						}
 						result.Spec.Replicas = &replicaCount
 						_, updateErr := deploymentsClient.Update(context.TODO(), result, metav1.UpdateOptions{})
 						return updateErr
 					})
 					if retryErr != nil {
-						log.Fatal().Msgf("Failed to set replica count: %v", retryErr)
+						log.Info().Msgf("Failed to set replica count: %v", retryErr)
+						continue
 					}
 					log.Info().Msgf("Successfully set replicas to %v", replicaCount)
+					// Not allowing this sleep interval to be configurable for now to prevent this value being set too low and
+					// calling the getReplicas API endpoint too frequently
 					time.Sleep(60 * time.Second)
 				}
 			},
