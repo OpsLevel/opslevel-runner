@@ -31,6 +31,7 @@ func RunLeaderElection(client *clientset.Clientset, lockName, lockIdentity, lock
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	logger := log.With().Str("worker", "leader").Logger()
 
 	leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
 		Lock:            lock,
@@ -41,15 +42,15 @@ func RunLeaderElection(client *clientset.Clientset, lockName, lockIdentity, lock
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(c context.Context) {
 				isLeader = true
-				log.Info().Msgf("Perform Migration")
+				logger.Info().Msgf("leader is %s", lockIdentity)
 				for {
-					log.Info().Msgf("leader is %s", lockIdentity)
+					time.Sleep(60 * time.Second)
 					replicaCount, err := getReplicas()
 					if err != nil {
-						log.Info().Msgf("Failed to get replica count: %v", err)
+						logger.Error().Err(err).Msg("Failed to get replica count")
 						continue
 					}
-					log.Info().Msgf("Setting replica count to %v", replicaCount)
+					logger.Info().Msgf("Ideal replica count is %v", replicaCount)
 					// Retry is being used below to prevent deployment update from overwriting a
 					// separate and unrelated update action per client-go's recommendation:
 					// https://github.com/kubernetes/client-go/blob/master/examples/create-update-delete-deployment/main.go#L117
@@ -57,7 +58,7 @@ func RunLeaderElection(client *clientset.Clientset, lockName, lockIdentity, lock
 						deploymentsClient := client.AppsV1().Deployments(lockNamespace)
 						result, getErr := deploymentsClient.Get(context.TODO(), lockName, metav1.GetOptions{})
 						if getErr != nil {
-							log.Info().Msgf("Failed to get latest version of Deployment: %v", getErr)
+							logger.Error().Err(getErr).Msg("Failed to get latest version of Deployment")
 							return getErr
 						}
 						result.Spec.Replicas = &replicaCount
@@ -65,13 +66,12 @@ func RunLeaderElection(client *clientset.Clientset, lockName, lockIdentity, lock
 						return updateErr
 					})
 					if retryErr != nil {
-						log.Info().Msgf("Failed to set replica count: %v", retryErr)
+						logger.Error().Err(retryErr).Msg("Failed to set replica count")
 						continue
 					}
-					log.Info().Msgf("Successfully set replicas to %v", replicaCount)
+					logger.Info().Msgf("Successfully set replica count to %v", replicaCount)
 					// Not allowing this sleep interval to be configurable for now to prevent this value being set too low and
 					// calling the getReplicas API endpoint too frequently
-					time.Sleep(60 * time.Second)
 				}
 			},
 			OnStoppedLeading: func() {
@@ -79,10 +79,10 @@ func RunLeaderElection(client *clientset.Clientset, lockName, lockIdentity, lock
 			},
 			OnNewLeader: func(currentId string) {
 				if !isLeader && currentId == lockIdentity {
-					log.Info().Msgf("%s started leading!", currentId)
+					logger.Info().Msgf("%s started leading!", currentId)
 					return
 				} else if !isLeader && currentId != lockIdentity {
-					log.Info().Msgf("leader is %s", currentId)
+					logger.Info().Msgf("leader is %s", currentId)
 				}
 			},
 		},
