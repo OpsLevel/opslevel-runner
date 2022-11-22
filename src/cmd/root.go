@@ -51,6 +51,8 @@ func init() {
 	rootCmd.PersistentFlags().String("runner-pod-name", "", "overrides environment variable 'RUNNER_POD_NAME'")
 	rootCmd.PersistentFlags().String("runner-pod-namespace", "default", "The kubernetes namespace the runner pod is deployed in. Overrides environment variable 'RUNNER_POD_NAMESPACE'")
 	rootCmd.PersistentFlags().String("runner-deployment", "runner", "The runner's kubernetes deployment name")
+	rootCmd.PersistentFlags().Int("runner-min-replicas", 1, "The min replicas the runner leader should not scale below")
+	rootCmd.PersistentFlags().Int("runner-max-replicas", 10, "The max replicas the runner leader should not scale above")
 
 	viper.BindPFlags(rootCmd.PersistentFlags())
 	viper.BindEnv("log-format", "OPSLEVEL_LOG_FORMAT")
