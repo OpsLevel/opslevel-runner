@@ -3,6 +3,7 @@ package pkg
 import (
 	"context"
 	"github.com/rs/zerolog/log"
+	"github.com/spf13/viper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -10,6 +11,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/util/retry"
+	"math"
 	"time"
 )
 
@@ -17,7 +19,7 @@ var (
 	isLeader bool
 )
 
-func RunLeaderElection(client *clientset.Clientset, lockName, lockIdentity, lockNamespace string) {
+func RunLeaderElection(client *clientset.Clientset, runnerId, lockName, lockIdentity, lockNamespace string) {
 	lock := &resourcelock.LeaseLock{
 		LeaseMeta: metav1.ObjectMeta{
 			Name:      lockName,
@@ -43,9 +45,15 @@ func RunLeaderElection(client *clientset.Clientset, lockName, lockIdentity, lock
 			OnStartedLeading: func(c context.Context) {
 				isLeader = true
 				logger.Info().Msgf("leader is %s", lockIdentity)
+				deploymentsClient := client.AppsV1().Deployments(lockNamespace)
 				for {
 					time.Sleep(60 * time.Second)
-					replicaCount, err := getReplicas()
+					result, getErr := deploymentsClient.Get(context.TODO(), lockName, metav1.GetOptions{})
+					if getErr != nil {
+						logger.Error().Err(getErr).Msg("Failed to get latest version of Deployment")
+						continue
+					}
+					replicaCount, err := getReplicaCount(runnerId, int(*result.Spec.Replicas))
 					if err != nil {
 						logger.Error().Err(err).Msg("Failed to get replica count")
 						continue
@@ -55,7 +63,6 @@ func RunLeaderElection(client *clientset.Clientset, lockName, lockIdentity, lock
 					// separate and unrelated update action per client-go's recommendation:
 					// https://github.com/kubernetes/client-go/blob/master/examples/create-update-delete-deployment/main.go#L117
 					retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-						deploymentsClient := client.AppsV1().Deployments(lockNamespace)
 						result, getErr := deploymentsClient.Get(context.TODO(), lockName, metav1.GetOptions{})
 						if getErr != nil {
 							logger.Error().Err(getErr).Msg("Failed to get latest version of Deployment")
@@ -89,8 +96,18 @@ func RunLeaderElection(client *clientset.Clientset, lockName, lockIdentity, lock
 	})
 }
 
-func getReplicas() (int32, error) {
-	return int32(1), nil
+func getReplicaCount(runnerId string, currentReplicas int) (int32, error) {
+	clientGQL := NewGraphClient("leader")
+	jobConcurrency := int(math.Max(float64(viper.GetInt("job-concurrency")), 1))
+	runnerScale, err := clientGQL.GetRunnerScale(runnerId, currentReplicas, jobConcurrency)
+	if err != nil {
+		return 0, err
+	}
+	recommendedReplicaCount := float64(runnerScale.RecommendedReplicaCount)
+	minReplicaCount := float64(viper.GetInt("runner-min-replicas"))
+	maxReplicaCount := float64(viper.GetInt("runner-max-replicas"))
+	replicaCount := math.Max(math.Min(recommendedReplicaCount, maxReplicaCount), minReplicaCount)
+	return int32(replicaCount), nil
 }
 
 func GetKubernetesConfig() (*rest.Config, error) {
