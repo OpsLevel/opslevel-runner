@@ -47,6 +47,8 @@ func RunLeaderElection(client *clientset.Clientset, runnerId, lockName, lockIden
 				logger.Info().Msgf("leader is %s", lockIdentity)
 				deploymentsClient := client.AppsV1().Deployments(lockNamespace)
 				for {
+					// Not allowing this sleep interval to be configurable for now
+					// to prevent it being set too low and causing thundering herd
 					time.Sleep(60 * time.Second)
 					result, getErr := deploymentsClient.Get(context.TODO(), lockName, metav1.GetOptions{})
 					if getErr != nil {
@@ -77,8 +79,7 @@ func RunLeaderElection(client *clientset.Clientset, runnerId, lockName, lockIden
 						continue
 					}
 					logger.Info().Msgf("Successfully set replica count to %v", replicaCount)
-					// Not allowing this sleep interval to be configurable for now to prevent this value being set too low and
-					// calling the getReplicas API endpoint too frequently
+
 				}
 			},
 			OnStoppedLeading: func() {
