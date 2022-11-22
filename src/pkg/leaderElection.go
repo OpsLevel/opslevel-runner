@@ -99,7 +99,7 @@ func RunLeaderElection(client *clientset.Clientset, runnerId, lockName, lockIden
 func getReplicaCount(runnerId string, currentReplicas int) (int32, error) {
 	clientGQL := NewGraphClient()
 	jobConcurrency := int(math.Max(float64(viper.GetInt("job-concurrency")), 1))
-	runnerScale, err := clientGQL.GetRunnerScale(runnerId, currentReplicas, jobConcurrency)
+	runnerScale, err := clientGQL.RunnerScale(runnerId, currentReplicas, jobConcurrency)
 	if err != nil {
 		return 0, err
 	}
