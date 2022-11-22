@@ -42,7 +42,7 @@ func doRun(cmd *cobra.Command, args []string) {
 	defer sentry.Flush(2 * time.Second)
 	logVersion()
 
-	client := getClientGQL()
+	client := pkg.NewGraphClient()
 
 	runner, err := client.RunnerRegister()
 	pkg.CheckErr(err)
@@ -51,10 +51,10 @@ func doRun(cmd *cobra.Command, args []string) {
 		config, err := pkg.GetKubernetesConfig()
 		pkg.CheckErr(err)
 
-		client := clientset.NewForConfigOrDie(config)
+		k8sClient := clientset.NewForConfigOrDie(config)
 
 		log.Info().Msgf("electing leader...")
-		go electLeader(client)
+		go electLeader(k8sClient, runner.Id.(string))
 	}
 
 	log.Info().Msgf("Starting runner for id '%s'", runner.Id)
@@ -68,12 +68,12 @@ func doRun(cmd *cobra.Command, args []string) {
 	client.RunnerUnregister(&runner.Id)
 }
 
-func electLeader(client *clientset.Clientset) {
+func electLeader(k8sClient *clientset.Clientset, runnerId string) {
 	leaseLockName := viper.GetString("runner-deployment")
 	leaseLockNamespace := viper.GetString("runner-pod-namespace")
 	lockIdentity := viper.GetString("runner-pod-name")
 
-	pkg.RunLeaderElection(client, leaseLockName, lockIdentity, leaseLockNamespace)
+	pkg.RunLeaderElection(k8sClient, runnerId, leaseLockName, lockIdentity, leaseLockNamespace)
 }
 
 func startWorkers(runnerId string, stop <-chan struct{}) *sync.WaitGroup {
@@ -102,7 +102,7 @@ func jobWorker(wg *sync.WaitGroup, index int, runnerId string, jobQueue <-chan o
 	logPrefix := func() string { return fmt.Sprintf("%s [%d] ", time.Now().UTC().Format(time.RFC3339), index) }
 	logLevel := strings.ToLower(viper.GetString("log-level"))
 	logger := log.With().Int("worker", index).Logger()
-	client := getClientGQL()
+	client := pkg.NewGraphClient()
 	tracer := pkg.GetTracer()
 	podConfig := newJobPodConfig()
 	runner, err := pkg.NewJobRunner(runnerId, logger, podConfig)
@@ -176,7 +176,7 @@ func jobWorker(wg *sync.WaitGroup, index int, runnerId string, jobQueue <-chan o
 
 func jobPoller(runnerId string, stop <-chan struct{}, jobQueue chan<- opslevel.RunnerJob) {
 	logger := log.With().Int("worker", 0).Logger()
-	client := getClientGQL()
+	client := pkg.NewGraphClient()
 	token := opslevel.NewID("")
 	poll_wait_time := time.Second * time.Duration(viper.GetInt("poll-interval"))
 	logger.Info().Msg("Starting polling for jobs")
