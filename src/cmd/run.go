@@ -42,7 +42,7 @@ func doRun(cmd *cobra.Command, args []string) {
 	defer sentry.Flush(2 * time.Second)
 	logVersion()
 
-	client := getClientGQL()
+	client := pkg.NewGraphClient()
 
 	runner, err := client.RunnerRegister()
 	pkg.CheckErr(err)
@@ -102,7 +102,7 @@ func jobWorker(wg *sync.WaitGroup, index int, runnerId string, jobQueue <-chan o
 	logPrefix := func() string { return fmt.Sprintf("%s [%d] ", time.Now().UTC().Format(time.RFC3339), index) }
 	logLevel := strings.ToLower(viper.GetString("log-level"))
 	logger := log.With().Int("worker", index).Logger()
-	client := getClientGQL()
+	client := pkg.NewGraphClient()
 	tracer := pkg.GetTracer()
 	podConfig := newJobPodConfig()
 	runner, err := pkg.NewJobRunner(runnerId, logger, podConfig)
@@ -176,7 +176,7 @@ func jobWorker(wg *sync.WaitGroup, index int, runnerId string, jobQueue <-chan o
 
 func jobPoller(runnerId string, stop <-chan struct{}, jobQueue chan<- opslevel.RunnerJob) {
 	logger := log.With().Int("worker", 0).Logger()
-	client := getClientGQL()
+	client := pkg.NewGraphClient()
 	token := opslevel.NewID("")
 	poll_wait_time := time.Second * time.Duration(viper.GetInt("poll-interval"))
 	logger.Info().Msg("Starting polling for jobs")

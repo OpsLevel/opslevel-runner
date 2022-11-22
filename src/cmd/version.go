@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/opslevel/opslevel-runner/pkg"
 	"github.com/rs/zerolog/log"
 	"runtime"
 
@@ -57,7 +58,7 @@ func getGoInfo() GoInfo {
 
 func getOpslevelVersion() OpslevelVersion {
 	opslevelVersion := OpslevelVersion{}
-	_, err := getClientRest().R().SetResult(&opslevelVersion).Get("api/ping")
+	_, err := pkg.NewRestClient().R().SetResult(&opslevelVersion).Get("api/ping")
 	cobra.CheckErr(err)
 
 	if len(opslevelVersion.Commit) >= 12 {

@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"fmt"
+	"github.com/go-resty/resty/v2"
 	"strings"
 
 	"github.com/opslevel/opslevel-go/v2022"
@@ -9,10 +10,32 @@ import (
 	"github.com/spf13/viper"
 )
 
-func NewGraphClient(version string) *opslevel.Client {
+var _version string
+var _clientRest *resty.Client
+var _clientGQL *opslevel.Client
+
+func SetClientVersion(version string) {
+	_version = version
+}
+
+func NewRestClient() *resty.Client {
+	if _clientRest == nil {
+		_clientRest = opslevel.NewRestClient(opslevel.SetURL(viper.GetString("api-url")))
+	}
+	return _clientRest
+}
+
+func NewGraphClient() *opslevel.Client {
+	if _clientGQL == nil {
+		_clientGQL = newGraphClient()
+	}
+	return _clientGQL
+}
+
+func newGraphClient() *opslevel.Client {
 	apiToken := viper.GetString("api-token")
 	apiURL := viper.GetString("api-url")
-	userAgent := fmt.Sprintf("opslevel-runner-%s", version)
+	userAgent := fmt.Sprintf("opslevel-runner-%s", _version)
 	client := opslevel.NewGQLClient(
 		opslevel.SetAPIToken(apiToken),
 		opslevel.SetURL(apiURL),
