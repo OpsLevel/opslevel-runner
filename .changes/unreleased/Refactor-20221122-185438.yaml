@@ -1,4 +1,0 @@
-kind: Refactor
-body: rename all `POD_*` env vars to `JOB_POD_*` to sync to the changes made to the
-  flags
-time: 2022-11-22T18:54:38.653422-06:00

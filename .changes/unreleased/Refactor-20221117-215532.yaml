@@ -1,4 +1,0 @@
-kind: Refactor
-body: add `--job-pod-max-lifetime` flag with a default of 3600 seconds (1hr) to limit
-  job pod lifetime
-time: 2022-11-17T21:55:32.520776-06:00

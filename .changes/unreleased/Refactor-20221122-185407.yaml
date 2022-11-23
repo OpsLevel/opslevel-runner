@@ -1,4 +1,0 @@
-kind: Refactor
-body: rename all `pod-*` flags to `job-pod-*` to clarify what they effect now that
-  the runner also self-scales
-time: 2022-11-22T18:54:07.621093-06:00
