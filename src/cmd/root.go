@@ -37,17 +37,17 @@ func init() {
 	rootCmd.PersistentFlags().String("log-level", "INFO", "overrides environment variable 'OPSLEVEL_LOG_LEVEL' (options [\"ERROR\", \"WARN\", \"INFO\", \"DEBUG\"])")
 	rootCmd.PersistentFlags().Bool("scaling-enabled", false, "Enables built-in pod scaling for kubernetes environment, defaults to false for local development")
 
-	// TODO: Update pod-* flags to job-pod-* to distinguish between job and runner specific values.  Moving this work over to separate ticket since it's a breaking change: https://gitlab.com/jklabsinc/OpsLevel/-/issues/5763
-	rootCmd.PersistentFlags().Int("pod-max-wait", 60, "The max amount of time to wait for the job pod to become healthy.")
+	rootCmd.PersistentFlags().Int("job-pod-max-wait", 60, "The max amount of time to wait for the job pod to become healthy.")
 	rootCmd.PersistentFlags().Int("job-pod-max-lifetime", 3600, "The max amount of time a job pod can run for.")
-	rootCmd.PersistentFlags().String("pod-namespace", "default", "The kubernetes namespace to create job pods in.")
-	rootCmd.PersistentFlags().Int64("pod-requests-cpu", 1000, "Default is in millicores.")
-	rootCmd.PersistentFlags().Int64("pod-requests-memory", 1024, "Pod job resource requests in MB.")
-	rootCmd.PersistentFlags().Int64("pod-limits-cpu", 1000, "Default is in millicores.")
-	rootCmd.PersistentFlags().Int64("pod-limits-memory", 1024, "Pod job resource limits in MB.")
-	rootCmd.PersistentFlags().String("pod-shell", "/bin/sh", "The shell to use for commands inside the pod.")
-	rootCmd.PersistentFlags().Int("pod-log-max-interval", 30, "The max amount of time between when pod logs are shipped to OpsLevel. Works in tandem with 'pod-log-max-size'")
-	rootCmd.PersistentFlags().Int("pod-log-max-size", 1000000, "The max amount in bytes to buffer before pod logs are shipped to OpsLevel. Works in tandem with 'pod-log-max-interval'")
+	rootCmd.PersistentFlags().String("job-pod-namespace", "default", "The kubernetes namespace to create job pods in.")
+	rootCmd.PersistentFlags().Int64("job-pod-requests-cpu", 1000, "The job pod resource requests cpu millicores.")
+	rootCmd.PersistentFlags().Int64("job-pod-requests-memory", 1024, "The job pod resource requests in MB.")
+	rootCmd.PersistentFlags().Int64("job-pod-limits-cpu", 1000, "The job pod resource limits cpu millicores.")
+	rootCmd.PersistentFlags().Int64("job-pod-limits-memory", 1024, "The job pod resource limits in MB.")
+	rootCmd.PersistentFlags().String("job-pod-shell", "/bin/sh", "The job pod shell to use for commands run inside the pod.")
+	rootCmd.PersistentFlags().Int("job-pod-log-max-interval", 30, "The max amount of time between when pod logs are shipped to OpsLevel. Works in tandem with 'job-pod-log-max-size'")
+	rootCmd.PersistentFlags().Int("job-pod-log-max-size", 1000000, "The max amount in bytes to buffer before pod logs are shipped to OpsLevel. Works in tandem with 'job-pod-log-max-interval'")
+
 	rootCmd.PersistentFlags().String("runner-pod-name", "", "overrides environment variable 'RUNNER_POD_NAME'")
 	rootCmd.PersistentFlags().String("runner-pod-namespace", "default", "The kubernetes namespace the runner pod is deployed in. Overrides environment variable 'RUNNER_POD_NAMESPACE'")
 	rootCmd.PersistentFlags().String("runner-deployment", "runner", "The runner's kubernetes deployment name")
@@ -59,26 +59,32 @@ func init() {
 	viper.BindEnv("log-level", "OPSLEVEL_LOG_LEVEL")
 	viper.BindEnv("api-url", "OPSLEVEL_API_URL", "OPSLEVEL_APP_URL")
 	viper.BindEnv("api-token", "OPSLEVEL_API_TOKEN")
-	viper.BindEnv("pod-max-wait", "OPSLEVEL_POD_MAX_WAIT")
-	viper.BindEnv("job-pod-max-lifetime", "OPSLEVEL_JOB_POD_MAX_LIFETIME")
-	viper.BindEnv("pod-namespace", "OPSLEVEL_POD_NAMESPACE")
-	viper.BindEnv("runner-pod-namespace", "RUNNER_POD_NAMESPACE")
-	viper.BindEnv("runner-pod-name", "RUNNER_POD_NAME")
-	viper.BindEnv("pod-shell", "OPSLEVEL_POD_SHELL")
-	viper.BindEnv("pod-log-max-interval", "OPSLEVEL_POD_LOG_MAX_INTERVAL")
-	viper.BindEnv("pod-log-max-size", "OPSLEVEL_POD_LOG_MAX_SIZE")
 	viper.BindEnv("scaling-enabled", "SCALING_ENABLED")
+
+	viper.BindEnv("job-pod-max-wait", "OPSLEVEL_JOB_POD_MAX_WAIT")
+	viper.BindEnv("job-pod-max-lifetime", "OPSLEVEL_JOB_POD_MAX_LIFETIME")
+	viper.BindEnv("job-pod-namespace", "OPSLEVEL_JOB_POD_NAMESPACE")
+	viper.BindEnv("job-pod-shell", "OPSLEVEL_JOB_POD_SHELL")
+	viper.BindEnv("job-pod-log-max-interval", "OPSLEVEL_JOB_POD_LOG_MAX_INTERVAL")
+	viper.BindEnv("job-pod-log-max-size", "OPSLEVEL_JOB_POD_LOG_MAX_SIZE")
+
+	viper.BindEnv("runner-pod-name", "RUNNER_POD_NAME")
+	viper.BindEnv("runner-pod-namespace", "RUNNER_POD_NAMESPACE")
+	viper.BindEnv("runner-deployment", "RUNNER_DEPLOYMENT")
+	viper.BindEnv("runner-min-replicas", "RUNNER_MIN_REPLICAS")
+	viper.BindEnv("runner-max-replicas", "RUNNER_MAX_REPLICAS")
+
 	cobra.OnInitialize(initConfig)
 }
 
 func newJobPodConfig() pkg.JobPodConfig {
 	return pkg.JobPodConfig{
-		Namespace:   viper.GetString("pod-namespace"),
+		Namespace:   viper.GetString("job-pod-namespace"),
 		Lifetime:    viper.GetInt("job-pod-max-lifetime"),
-		CpuRequests: viper.GetInt64("pod-requests-cpu"),
-		MemRequests: viper.GetInt64("pod-requests-memory"),
-		CpuLimit:    viper.GetInt64("pod-limits-cpu"),
-		MemLimit:    viper.GetInt64("pod-limits-memory"),
+		CpuRequests: viper.GetInt64("job-pod-requests-cpu"),
+		MemRequests: viper.GetInt64("job-pod-requests-memory"),
+		CpuLimit:    viper.GetInt64("job-pod-limits-cpu"),
+		MemLimit:    viper.GetInt64("job-pod-limits-memory"),
 	}
 }
 

@@ -97,8 +97,8 @@ func getConcurrency() int {
 }
 
 func jobWorker(wg *sync.WaitGroup, index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
-	logMaxBytes := viper.GetInt("pod-log-max-size")
-	logMaxDuration := time.Duration(viper.GetInt("pod-log-max-interval")) * time.Second
+	logMaxBytes := viper.GetInt("job-pod-log-max-size")
+	logMaxDuration := time.Duration(viper.GetInt("job-pod-log-max-interval")) * time.Second
 	logPrefix := func() string { return fmt.Sprintf("%s [%d] ", time.Now().UTC().Format(time.RFC3339), index) }
 	logLevel := strings.ToLower(viper.GetString("log-level"))
 	logger := log.With().Int("worker", index).Logger()

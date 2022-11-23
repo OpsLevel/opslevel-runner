@@ -6,7 +6,7 @@ require (
 	github.com/getsentry/sentry-go v0.13.0
 	github.com/go-resty/resty/v2 v2.7.0
 	github.com/opslevel/opslevel-common/v2022 v2022.6.28
-	//github.com/opslevel/opslevel-go/v2022 v2022.8.25
+	github.com/opslevel/opslevel-go/v2022 v2022.10.22
 	github.com/prometheus/client_golang v1.12.2
 	github.com/rocktavious/autopilot v0.1.5
 	github.com/rs/zerolog v1.28.0
@@ -18,8 +18,6 @@ require (
 	k8s.io/apimachinery v0.25.4
 	k8s.io/client-go v0.25.4
 )
-
-require github.com/opslevel/opslevel-go/v2022 v2022.0.0-00010101000000-000000000000
 
 require (
 	cloud.google.com/go v0.97.0 // indirect

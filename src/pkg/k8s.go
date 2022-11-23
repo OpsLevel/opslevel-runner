@@ -232,7 +232,7 @@ func (s *JobRunner) Run(job opslevel.RunnerJob, stdout, stderr *SafeBuffer) JobO
 	// TODO: if we reuse pods then delete should not happen
 	defer s.DeletePod(pod)
 
-	timeout := time.Second * time.Duration(viper.GetInt("pod-max-wait"))
+	timeout := time.Second * time.Duration(viper.GetInt("job-pod-max-wait"))
 	waitErr := s.WaitForPod(pod, timeout)
 	if waitErr != nil {
 		// TODO: get pod status or status message?
