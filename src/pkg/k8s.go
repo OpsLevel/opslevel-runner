@@ -135,6 +135,7 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 		},
 		Spec: corev1.PodSpec{
 			TerminationGracePeriodSeconds: &[]int64{5}[0],
+			RestartPolicy:                 corev1.RestartPolicyNever,
 			Containers: []corev1.Container{
 				{
 					Name:            "job",
