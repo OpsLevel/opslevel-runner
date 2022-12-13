@@ -1,0 +1,4 @@
+kind: "Dependency"
+body: "Bump github.com/getsentry/sentry-go from 0.13.0 to 0.16.0 in /src"
+time: 2022-12-13T10:28:49.00000Z
+
