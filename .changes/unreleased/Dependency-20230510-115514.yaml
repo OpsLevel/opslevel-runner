@@ -1,0 +1,4 @@
+kind: "Dependency"
+body: "Bump golang.org/x/net from 0.3.1-0.20221206200815-1e63c2f08a10 to 0.7.0 in /src"
+time: 2023-05-10T11:55:14.00000Z
+
