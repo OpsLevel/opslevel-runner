@@ -40,6 +40,7 @@ func newGraphClient() *opslevel.Client {
 		opslevel.SetAPIToken(apiToken),
 		opslevel.SetURL(apiURL),
 		opslevel.SetUserAgentExtra(userAgent),
+		opslevel.SetMaxRetries(5),
 		opslevel.SetAPIVisibility("internal"),
 	)
 
