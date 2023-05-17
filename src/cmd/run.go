@@ -117,10 +117,10 @@ func jobWorker(wg *sync.WaitGroup, index int, runnerId string, jobQueue <-chan o
 
 		streamer := pkg.NewLogStreamer(
 			logger,
-			pkg.NewSetOutcomeVarLogProcessor(client, logger, runnerId, jobId, jobNumber),
 			pkg.NewSanitizeLogProcessor(job.Variables),
 			pkg.NewPrefixLogProcessor(logPrefix),
 			pkg.NewOpsLevelAppendLogProcessor(client, logger, runnerId, jobId, jobNumber, logMaxBytes, logMaxDuration),
+			pkg.NewSetOutcomeVarLogProcessor(client, logger, runnerId, jobId, jobNumber),
 		)
 		if logLevel == "trace" {
 			streamer.AddProcessor(pkg.NewLoggerLogProcessor(logger))
