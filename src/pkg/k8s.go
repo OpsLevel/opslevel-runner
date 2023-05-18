@@ -285,6 +285,7 @@ func getKubernetesConfig() (*rest.Config, error) {
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	configOverrides := &clientcmd.ConfigOverrides{}
 	config, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides).ClientConfig()
+	config.Timeout = time.Second * time.Duration(viper.GetInt("job-pod-exec-max-wait"))
 	if err != nil {
 		return nil, err
 	}

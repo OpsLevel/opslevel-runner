@@ -1,0 +1,3 @@
+kind: Feature
+body: Add flag to override the job pod max wait time for exec command
+time: 2023-05-18T08:22:47.266924-05:00

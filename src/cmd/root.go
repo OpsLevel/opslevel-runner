@@ -38,6 +38,7 @@ func init() {
 	rootCmd.PersistentFlags().Bool("scaling-enabled", false, "Enables built-in pod scaling for kubernetes environment, defaults to false for local development")
 
 	rootCmd.PersistentFlags().Int("job-pod-max-wait", 60, "The max amount of time to wait for the job pod to become healthy.")
+	rootCmd.PersistentFlags().Int("job-pod-exec-max-wait", 60, "The max amount of time to wait for a job pod exec command with no output before timing out.")
 	rootCmd.PersistentFlags().Int("job-pod-max-lifetime", 3600, "The max amount of time a job pod can run for.")
 	rootCmd.PersistentFlags().String("job-pod-namespace", "default", "The kubernetes namespace to create job pods in.")
 	rootCmd.PersistentFlags().Int64("job-pod-requests-cpu", 1000, "The job pod resource requests cpu millicores.")
