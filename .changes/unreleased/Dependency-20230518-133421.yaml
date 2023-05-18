@@ -1,0 +1,4 @@
+kind: "Dependency"
+body: "Bump docker/login-action from 1 to 2"
+time: 2023-05-18T13:34:21.00000Z
+
