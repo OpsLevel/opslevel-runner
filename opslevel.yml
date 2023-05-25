@@ -4,7 +4,7 @@ service:
   name: Opslevel Runner
   lifecycle: alpha
   tier: tier_1
-  product: 
+  system: opslevel_application 
   owner: platform
   language: Go
   framework: Cobra
