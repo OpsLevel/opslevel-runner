@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"context"
+	"github.com/opslevel/opslevel-go/v2023"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,7 +20,7 @@ var (
 	isLeader bool
 )
 
-func RunLeaderElection(client *clientset.Clientset, runnerId, lockName, lockIdentity, lockNamespace string) {
+func RunLeaderElection(client *clientset.Clientset, runnerId opslevel.ID, lockName, lockIdentity, lockNamespace string) {
 	lock := &resourcelock.LeaseLock{
 		LeaseMeta: metav1.ObjectMeta{
 			Name:      lockName,
@@ -97,7 +98,7 @@ func RunLeaderElection(client *clientset.Clientset, runnerId, lockName, lockIden
 	})
 }
 
-func getReplicaCount(runnerId string, currentReplicas int) (int32, error) {
+func getReplicaCount(runnerId opslevel.ID, currentReplicas int) (int32, error) {
 	clientGQL := NewGraphClient()
 	jobConcurrency := int(math.Max(float64(viper.GetInt("job-concurrency")), 1))
 	runnerScale, err := clientGQL.RunnerScale(runnerId, currentReplicas, jobConcurrency)

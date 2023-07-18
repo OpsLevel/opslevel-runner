@@ -1,0 +1,3 @@
+kind: Feature
+body: Increase timeout on graphql requests to 60s
+time: 2023-07-18T16:10:36.986992-05:00

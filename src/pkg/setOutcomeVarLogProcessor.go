@@ -17,14 +17,14 @@ var endOutcomeVarExp = regexp.MustCompile(`^::end-multiline-outcome-var`)
 type SetOutcomeVarLogProcessor struct {
 	client                 *opslevel.Client
 	logger                 zerolog.Logger
-	runnerId               string
-	jobId                  string
+	runnerId               opslevel.ID
+	jobId                  opslevel.ID
 	jobNumber              string
 	multilineOutcomeVarKey Stack[string]
 	vars                   map[string]string
 }
 
-func NewSetOutcomeVarLogProcessor(client *opslevel.Client, logger zerolog.Logger, runnerId string, jobId string, jobNumber string) *SetOutcomeVarLogProcessor {
+func NewSetOutcomeVarLogProcessor(client *opslevel.Client, logger zerolog.Logger, runnerId opslevel.ID, jobId opslevel.ID, jobNumber string) *SetOutcomeVarLogProcessor {
 	return &SetOutcomeVarLogProcessor{
 		client:                 client,
 		logger:                 logger,
@@ -98,8 +98,8 @@ func (s *SetOutcomeVarLogProcessor) Flush(outcome JobOutcome) {
 	}
 
 	err := s.client.RunnerReportJobOutcome(opslevel.RunnerReportJobOutcomeInput{
-		RunnerId:         s.runnerId,
-		RunnerJobId:      s.jobId,
+		RunnerId:         opslevel.ID(s.runnerId),
+		RunnerJobId:      opslevel.ID(s.jobId),
 		Outcome:          outcome.Outcome,
 		OutcomeVariables: vars,
 	})

@@ -31,7 +31,7 @@ func doTest(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	if job.Id == nil {
+	if job.Id == "" {
 		job.Id = "1"
 	}
 	streamer := pkg.NewLogStreamer(
