@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"github.com/go-resty/resty/v2"
 	"strings"
+	"time"
 
-	"github.com/opslevel/opslevel-go/v2022"
+	"github.com/opslevel/opslevel-go/v2023"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -41,6 +42,7 @@ func newGraphClient() *opslevel.Client {
 		opslevel.SetURL(apiURL),
 		opslevel.SetUserAgentExtra(userAgent),
 		opslevel.SetMaxRetries(5),
+		opslevel.SetTimeout(60*time.Second),
 		opslevel.SetAPIVisibility("internal"),
 	)
 

@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/opslevel/opslevel-go/v2022"
+	"github.com/opslevel/opslevel-go/v2023"
 	"github.com/opslevel/opslevel-runner/pkg"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -31,7 +31,7 @@ func doTest(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	if job.Id == nil {
+	if job.Id == "" {
 		job.Id = "1"
 	}
 	streamer := pkg.NewLogStreamer(

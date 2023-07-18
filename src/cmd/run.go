@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/opslevel/opslevel-go/v2022"
+	"github.com/opslevel/opslevel-go/v2023"
 	"github.com/opslevel/opslevel-runner/pkg"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -54,21 +54,21 @@ func doRun(cmd *cobra.Command, args []string) {
 		k8sClient := clientset.NewForConfigOrDie(config)
 
 		log.Info().Msgf("electing leader...")
-		go electLeader(k8sClient, runner.Id.(string))
+		go electLeader(k8sClient, runner.Id)
 	}
 
 	log.Info().Msgf("Starting runner for id '%s'", runner.Id)
-	pkg.StartMetricsServer(runner.Id.(string), viper.GetInt("metrics-port"))
+	pkg.StartMetricsServer(runner.Id, viper.GetInt("metrics-port"))
 	stop := opslevel_common.InitSignalHandler()
-	wg := startWorkers(runner.Id.(string), stop)
+	wg := startWorkers(runner.Id, stop)
 	<-stop // Enter Forever Loop
 	log.Info().Msgf("interupt - waiting for jobs to complete ...")
 	wg.Wait()
 	log.Info().Msgf("Unregister runner for id '%s'...", runner.Id)
-	client.RunnerUnregister(&runner.Id)
+	client.RunnerUnregister(runner.Id)
 }
 
-func electLeader(k8sClient *clientset.Clientset, runnerId string) {
+func electLeader(k8sClient *clientset.Clientset, runnerId opslevel.ID) {
 	leaseLockName := viper.GetString("runner-deployment")
 	leaseLockNamespace := viper.GetString("runner-pod-namespace")
 	lockIdentity := viper.GetString("runner-pod-name")
@@ -76,7 +76,7 @@ func electLeader(k8sClient *clientset.Clientset, runnerId string) {
 	pkg.RunLeaderElection(k8sClient, runnerId, leaseLockName, lockIdentity, leaseLockNamespace)
 }
 
-func startWorkers(runnerId string, stop <-chan struct{}) *sync.WaitGroup {
+func startWorkers(runnerId opslevel.ID, stop <-chan struct{}) *sync.WaitGroup {
 	wg := sync.WaitGroup{}
 	concurrency := getConcurrency()
 	wg.Add(concurrency)
@@ -96,7 +96,7 @@ func getConcurrency() int {
 	return concurrency
 }
 
-func jobWorker(wg *sync.WaitGroup, index int, runnerId string, jobQueue <-chan opslevel.RunnerJob) {
+func jobWorker(wg *sync.WaitGroup, index int, runnerId opslevel.ID, jobQueue <-chan opslevel.RunnerJob) {
 	logMaxBytes := viper.GetInt("job-pod-log-max-size")
 	logMaxDuration := time.Duration(viper.GetInt("job-pod-log-max-interval")) * time.Second
 	logPrefix := func() string { return fmt.Sprintf("%s [%d] ", time.Now().UTC().Format(time.RFC3339), index) }
@@ -112,7 +112,7 @@ func jobWorker(wg *sync.WaitGroup, index int, runnerId string, jobQueue <-chan o
 	defer wg.Done()
 	for job := range jobQueue {
 		ctx := context.Background()
-		jobId := job.Id.(string)
+		jobId := job.Id
 		jobNumber := job.Number()
 
 		streamer := pkg.NewLogStreamer(
@@ -174,10 +174,10 @@ func jobWorker(wg *sync.WaitGroup, index int, runnerId string, jobQueue <-chan o
 	logger.Info().Msgf("Shutting down job processor %d ...", index)
 }
 
-func jobPoller(runnerId string, stop <-chan struct{}, jobQueue chan<- opslevel.RunnerJob) {
+func jobPoller(runnerId opslevel.ID, stop <-chan struct{}, jobQueue chan<- opslevel.RunnerJob) {
 	logger := log.With().Int("worker", 0).Logger()
 	client := pkg.NewGraphClient()
-	token := opslevel.NewID("")
+	token := opslevel.ID("")
 	poll_wait_time := time.Second * time.Duration(viper.GetInt("poll-interval"))
 	logger.Info().Msg("Starting polling for jobs")
 	for {
@@ -190,14 +190,14 @@ func jobPoller(runnerId string, stop <-chan struct{}, jobQueue chan<- opslevel.R
 			logger.Trace().Msg("Polling for jobs ...")
 			continue_polling := true
 			for continue_polling {
-				logger.Debug().Msgf("Get pending jobs with lastUpdateToken '%v' ...", *token)
+				logger.Debug().Msgf("Get pending jobs with lastUpdateToken '%v' ...", token)
 				job, nextToken, err := client.RunnerGetPendingJob(runnerId, token)
 				if err != nil {
 					logger.Error().Err(err).Msg("got error when getting pending job")
 					continue_polling = false
 				} else {
 					token = nextToken
-					if job.Id == nil {
+					if job.Id == "" {
 						continue_polling = false
 					} else {
 						logger.Debug().Msgf("Enqueuing job '%s'", job.Number())

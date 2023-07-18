@@ -1,7 +1,7 @@
 package pkg
 
 import (
-	"github.com/opslevel/opslevel-go/v2022"
+	"github.com/opslevel/opslevel-go/v2023"
 	"github.com/rocktavious/autopilot"
 	"testing"
 )

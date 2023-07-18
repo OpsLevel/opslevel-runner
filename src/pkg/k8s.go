@@ -20,7 +20,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/remotecommand"
 
-	"github.com/opslevel/opslevel-go/v2022"
+	"github.com/opslevel/opslevel-go/v2023"
 	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
 )
@@ -36,7 +36,7 @@ type JobConfig struct {
 }
 
 type JobRunner struct {
-	runnerId     string
+	runnerId     opslevel.ID
 	logger       zerolog.Logger
 	config       *rest.Config
 	clientset    *kubernetes.Clientset
@@ -58,7 +58,7 @@ type JobPodConfig struct {
 	MemLimit    int64 //in MB
 }
 
-func NewJobRunner(runnerId string, logger zerolog.Logger, jobPodConfig JobPodConfig) (*JobRunner, error) {
+func NewJobRunner(runnerId opslevel.ID, logger zerolog.Logger, jobPodConfig JobPodConfig) (*JobRunner, error) {
 	config, err := getKubernetesConfig()
 	if err != nil {
 		return nil, err
@@ -185,7 +185,7 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 
 // TODO: Remove all usages of "Viper" they should be passed in at JobRunner configuraiton time
 func (s *JobRunner) Run(job opslevel.RunnerJob, stdout, stderr *SafeBuffer) JobOutcome {
-	id := job.Id.(string)
+	id := string(job.Id)
 	identifier := fmt.Sprintf("opslevel-job-%s-%d", job.Number(), time.Now().Unix())
 	runnerIdentifier := fmt.Sprintf("runner-%s", s.runnerId)
 	labels := map[string]string{

@@ -2,7 +2,7 @@ package pkg
 
 import (
 	"encoding/base64"
-	"github.com/opslevel/opslevel-go/v2022"
+	"github.com/opslevel/opslevel-go/v2023"
 	"github.com/rs/zerolog"
 	"time"
 )
@@ -10,8 +10,8 @@ import (
 type OpsLevelAppendLogProcessor struct {
 	client            *opslevel.Client
 	logger            zerolog.Logger
-	runnerId          string
-	jobId             string
+	runnerId          opslevel.ID
+	jobId             opslevel.ID
 	jobNumber         string
 	maxBytes          int
 	maxTime           time.Duration
@@ -22,7 +22,7 @@ type OpsLevelAppendLogProcessor struct {
 	elapsed           time.Duration
 }
 
-func NewOpsLevelAppendLogProcessor(client *opslevel.Client, logger zerolog.Logger, runnerId string, jobId string, jobNumber string, maxBytes int, maxTime time.Duration) *OpsLevelAppendLogProcessor {
+func NewOpsLevelAppendLogProcessor(client *opslevel.Client, logger zerolog.Logger, runnerId opslevel.ID, jobId opslevel.ID, jobNumber string, maxBytes int, maxTime time.Duration) *OpsLevelAppendLogProcessor {
 	return &OpsLevelAppendLogProcessor{
 		client:            client,
 		logger:            logger,
@@ -86,8 +86,8 @@ func (s *OpsLevelAppendLogProcessor) Flush(outcome JobOutcome) {
 func (s *OpsLevelAppendLogProcessor) submit() {
 	if s.client != nil && len(s.logLines) > 0 {
 		err := s.client.RunnerAppendJobLog(opslevel.RunnerAppendJobLogInput{
-			RunnerId:    s.runnerId,
-			RunnerJobId: s.jobId,
+			RunnerId:    opslevel.ID(s.runnerId),
+			RunnerJobId: opslevel.ID(s.jobId),
 			SentAt:      opslevel.NewISO8601DateNow(),
 			Logs:        s.logLines,
 		})
