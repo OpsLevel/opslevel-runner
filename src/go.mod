@@ -1,6 +1,6 @@
 module github.com/opslevel/opslevel-runner
 
-go 1.19
+go 1.20
 
 require (
 	github.com/getsentry/sentry-go v0.21.0

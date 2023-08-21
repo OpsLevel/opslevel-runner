@@ -2,9 +2,10 @@ package pkg
 
 import (
 	"encoding/base64"
+	"time"
+
 	"github.com/opslevel/opslevel-go/v2023"
 	"github.com/rs/zerolog"
-	"time"
 )
 
 type OpsLevelAppendLogProcessor struct {
@@ -49,7 +50,7 @@ func (s *OpsLevelAppendLogProcessor) Process(line string) string {
 
 	s.logLinesBytesSize += lineBytesSize
 	s.logLines = append(s.logLines, base64.StdEncoding.EncodeToString(lineInBytes))
-	if s.firstLine == false {
+	if !s.firstLine {
 		s.logger.Trace().Msg("Shipping logs because its the first line ...")
 		s.firstLine = true
 		s.submit()
