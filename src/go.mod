@@ -1,6 +1,6 @@
 module github.com/opslevel/opslevel-runner
 
-go 1.19
+go 1.21
 
 require (
 	github.com/getsentry/sentry-go v0.21.0
@@ -100,4 +100,4 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
-replace github.com/opslevel/opslevel-go/v2023 => ./submodules/opslevel-go
+//replace github.com/opslevel/opslevel-go/v2023 => ./submodules/opslevel-go
