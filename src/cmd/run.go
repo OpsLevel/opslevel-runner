@@ -4,15 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/getsentry/sentry-go"
 	opslevel_common "github.com/opslevel/opslevel-common/v2022"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 	clientset "k8s.io/client-go/kubernetes"
-	"strings"
-	"sync"
-	"time"
 
 	"github.com/opslevel/opslevel-go/v2023"
 	"github.com/opslevel/opslevel-runner/pkg"
@@ -137,7 +138,7 @@ func jobWorker(wg *sync.WaitGroup, index int, runnerId opslevel.ID, jobQueue <-c
 			trace.WithAttributes(attribute.String("job", jobNumber)),
 		)
 		outcome := runner.Run(job, streamer.Stdout, streamer.Stderr)
-		ctx, spanFinish := tracer.Start(ctx,
+		_, spanFinish := tracer.Start(ctx,
 			"finish-job",
 			trace.WithSpanKind(trace.SpanKindConsumer),
 			trace.WithAttributes(attribute.String("job", jobNumber)))
