@@ -100,4 +100,4 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
-//replace github.com/opslevel/opslevel-go/v2023 => ./submodules/opslevel-go
+replace github.com/opslevel/opslevel-go/v2023 => ./submodules/opslevel-go
