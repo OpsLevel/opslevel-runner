@@ -3,7 +3,7 @@ module github.com/opslevel/opslevel-runner
 go 1.20
 
 require (
-	github.com/getsentry/sentry-go v0.21.0
+	github.com/getsentry/sentry-go v0.23.0
 	github.com/go-resty/resty/v2 v2.7.0
 	github.com/opslevel/opslevel-common/v2022 v2022.6.28
 	github.com/opslevel/opslevel-go/v2023 v2023.7.17
