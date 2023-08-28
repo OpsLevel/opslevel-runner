@@ -8,7 +8,7 @@ env:
 tasks:
   lint:
     desc: Formatting and linting
-    dir: src
+    dir: "{{.SRC_DIR}}"
     cmds:
       - gofmt -d .
       - go vet ./...
@@ -16,7 +16,7 @@ tasks:
 
   lintfix:
     desc: Fix formatting and linting
-    dir: src
+    dir: "{{.SRC_DIR}}"
     cmds:
       - gofmt -w .
       - go mod tidy
@@ -24,10 +24,17 @@ tasks:
 
   test:
     desc: Run tests
-    dir: src
+    dir: "{{.SRC_DIR}}"
     cmds:
       - go test -race -coverprofile=coverage.txt -covermode=atomic -v ./... {{ .CLI_ARGS }}
     silent: true
+
+  update-opslevel-go:
+    desc: Update opslevel-go version to latest release
+    dir: "{{.SRC_DIR}}"
+    cmds:
+      - go get github.com/opslevel/opslevel-go/v2023@none
+      - go mod tidy
 
   workspace:
     desc: Setup workspace for cli & opslevel-go development
