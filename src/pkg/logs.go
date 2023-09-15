@@ -2,9 +2,10 @@ package pkg
 
 import (
 	"container/ring"
-	"github.com/rs/zerolog"
 	"strings"
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
 type LogProcessor interface {

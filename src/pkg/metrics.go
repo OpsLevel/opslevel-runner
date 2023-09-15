@@ -2,8 +2,9 @@ package pkg
 
 import (
 	"fmt"
-	"github.com/opslevel/opslevel-go/v2023"
 	"net/http"
+
+	"github.com/opslevel/opslevel-go/v2023"
 
 	"github.com/prometheus/client_golang/prometheus/collectors"
 

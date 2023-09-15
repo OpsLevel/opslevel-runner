@@ -2,6 +2,9 @@ package pkg
 
 import (
 	"context"
+	"math"
+	"time"
+
 	"github.com/opslevel/opslevel-go/v2023"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
@@ -12,13 +15,9 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/util/retry"
-	"math"
-	"time"
 )
 
-var (
-	isLeader bool
-)
+var isLeader bool
 
 func RunLeaderElection(client *clientset.Clientset, runnerId opslevel.ID, lockName, lockIdentity, lockNamespace string) {
 	lock := &resourcelock.LeaseLock{

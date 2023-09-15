@@ -1,10 +1,11 @@
 package pkg
 
 import (
+	"os"
+
 	"github.com/getsentry/sentry-go"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	"os"
 )
 
 func CheckErr(err error) {

@@ -3,16 +3,19 @@ package pkg
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/opslevel/opslevel-go/v2023"
-	"github.com/rs/zerolog"
 	"regexp"
 	"strings"
+
+	"github.com/opslevel/opslevel-go/v2023"
+	"github.com/rs/zerolog"
 )
 
-var skipCapture = regexp.MustCompile(`^\+\s.*$`)
-var setOutcomeVarExp = regexp.MustCompile(`^::set-outcome-var\s(?P<Key>[\w-]+)=(?P<Value>.*)`)
-var startOutcomeVarExp = regexp.MustCompile(`^::start-multiline-outcome-var\s(?P<Key>[\w-]+)`)
-var endOutcomeVarExp = regexp.MustCompile(`^::end-multiline-outcome-var`)
+var (
+	skipCapture        = regexp.MustCompile(`^\+\s.*$`)
+	setOutcomeVarExp   = regexp.MustCompile(`^::set-outcome-var\s(?P<Key>[\w-]+)=(?P<Value>.*)`)
+	startOutcomeVarExp = regexp.MustCompile(`^::start-multiline-outcome-var\s(?P<Key>[\w-]+)`)
+	endOutcomeVarExp   = regexp.MustCompile(`^::end-multiline-outcome-var`)
+)
 
 type SetOutcomeVarLogProcessor struct {
 	client                 *opslevel.Client

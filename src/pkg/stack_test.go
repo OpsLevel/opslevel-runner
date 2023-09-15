@@ -1,8 +1,9 @@
 package pkg
 
 import (
-	"github.com/rocktavious/autopilot"
 	"testing"
+
+	"github.com/rocktavious/autopilot"
 )
 
 func TestStack(t *testing.T) {

@@ -1,9 +1,10 @@
 package pkg
 
 import (
+	"testing"
+
 	"github.com/rocktavious/autopilot"
 	"github.com/rs/zerolog/log"
-	"testing"
 )
 
 func TestSetOutcomeVarLogProcessor(t *testing.T) {

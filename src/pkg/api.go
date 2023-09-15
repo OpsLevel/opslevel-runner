@@ -2,18 +2,21 @@ package pkg
 
 import (
 	"fmt"
-	"github.com/go-resty/resty/v2"
 	"strings"
 	"time"
+
+	"github.com/go-resty/resty/v2"
 
 	"github.com/opslevel/opslevel-go/v2023"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-var _version string
-var _clientRest *resty.Client
-var _clientGQL *opslevel.Client
+var (
+	_version    string
+	_clientRest *resty.Client
+	_clientGQL  *opslevel.Client
+)
 
 func SetClientVersion(version string) {
 	_version = version
