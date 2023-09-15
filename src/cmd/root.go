@@ -1,9 +1,10 @@
 package cmd
 
 import (
-	"github.com/getsentry/sentry-go"
 	"os"
 	"strings"
+
+	"github.com/getsentry/sentry-go"
 
 	"github.com/opslevel/opslevel-runner/pkg"
 	"github.com/rs/zerolog"
@@ -12,9 +13,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-var (
-	cfgFile string
-)
+var cfgFile string
 
 var rootCmd = &cobra.Command{
 	Use:   "opslevel-runner",

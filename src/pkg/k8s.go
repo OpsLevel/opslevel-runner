@@ -4,11 +4,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
+	"time"
+
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-	"strings"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -51,11 +52,11 @@ type JobOutcome struct {
 
 type JobPodConfig struct {
 	Namespace   string
-	Lifetime    int   //in seconds
-	CpuRequests int64 //in millicores!
-	MemRequests int64 //in MB
-	CpuLimit    int64 //in millicores!
-	MemLimit    int64 //in MB
+	Lifetime    int   // in seconds
+	CpuRequests int64 // in millicores!
+	MemRequests int64 // in MB
+	CpuLimit    int64 // in millicores!
+	MemLimit    int64 // in MB
 }
 
 func NewJobRunner(runnerId opslevel.ID, logger zerolog.Logger, jobPodConfig JobPodConfig) (*JobRunner, error) {

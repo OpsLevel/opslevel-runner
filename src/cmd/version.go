@@ -3,9 +3,10 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"runtime"
+
 	"github.com/opslevel/opslevel-runner/pkg"
 	"github.com/rs/zerolog/log"
-	"runtime"
 
 	"github.com/spf13/cobra"
 )
