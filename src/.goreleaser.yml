@@ -24,6 +24,7 @@ archives:
   - name_template: '{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}'
 dockers:
   - image_templates:
+    - "public.ecr.aws/opslevel/opslevel-runner:latest"
     - "public.ecr.aws/opslevel/opslevel-runner:{{ .Tag }}"
     build_flag_templates:
     - "--label=org.opencontainers.image.created={{ .Date }}"
