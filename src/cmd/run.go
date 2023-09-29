@@ -229,7 +229,7 @@ func runFaktory(runnerId string) {
 
 	mgr := worker.NewManager()
 	mgr.Register("legacy", func(ctx context.Context, args ...interface{}) error {
-		//helper := worker.HelperFor(ctx)
+		helper := worker.HelperFor(ctx)
 
 		var job opslevel.RunnerJob
 		data, err := json.Marshal(args[0])
@@ -239,6 +239,15 @@ func runFaktory(runnerId string) {
 		err = json.Unmarshal(data, &job)
 		if err != nil {
 			return err
+		}
+
+		batch := helper.Bid()
+		if batch != "" {
+			job.Variables = append(job.Variables, opslevel.RunnerJobVariable{
+				Key:       "FAKTORY_BATCH_ID",
+				Value:     batch,
+				Sensitive: false,
+			})
 		}
 
 		// TODO: add log processors that ships log chunks as jobs
