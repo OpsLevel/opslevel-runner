@@ -3,6 +3,7 @@ module github.com/opslevel/opslevel-runner
 go 1.21
 
 require (
+	github.com/contribsys/faktory v1.8.0
 	github.com/getsentry/sentry-go v0.21.0
 	github.com/go-resty/resty/v2 v2.7.0
 	github.com/opslevel/opslevel-common/v2022 v2022.6.28
@@ -32,6 +33,7 @@ require (
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
+	github.com/contribsys/faktory_worker_go v1.6.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.8.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect

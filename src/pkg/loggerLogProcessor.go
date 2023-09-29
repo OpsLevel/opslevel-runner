@@ -16,7 +16,7 @@ func NewLoggerLogProcessor(logger zerolog.Logger) *LoggerLogProcessor {
 
 func (s *LoggerLogProcessor) Process(line string) string {
 	if len(line) > 0 {
-		s.logger.Info().Msgf(line)
+		s.logger.Info().Msg(line)
 	}
 	return line
 }
