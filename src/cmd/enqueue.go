@@ -32,7 +32,7 @@ var enqueueCmd = &cobra.Command{
 		client, err := faktory.Open()
 		cobra.CheckErr(err)
 
-		j := faktory.NewJob(job.Type, job.Args)
+		j := faktory.NewJob(job.Type, job.Args...)
 		j.Queue = job.Queue
 		j.At = job.At
 		j.ReserveFor = job.ReserveFor

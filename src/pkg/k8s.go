@@ -145,12 +145,12 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 					Command: []string{
 						"cp",
 						"/opslevel-runner",
-						"/mount/bin",
+						"/mount",
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{
 							Name:      "shared",
-							ReadOnly:  true,
+							ReadOnly:  false,
 							MountPath: "/mount",
 						},
 					},

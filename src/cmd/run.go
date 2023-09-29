@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	worker "github.com/contribsys/faktory_worker_go"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -230,7 +231,7 @@ func runFaktory(runnerId string) {
 	mgr := worker.NewManager()
 	mgr.Register("legacy", func(ctx context.Context, args ...interface{}) error {
 		helper := worker.HelperFor(ctx)
-
+		
 		var job opslevel.RunnerJob
 		data, err := json.Marshal(args[0])
 		if err != nil {
@@ -246,6 +247,22 @@ func runFaktory(runnerId string) {
 			job.Variables = append(job.Variables, opslevel.RunnerJobVariable{
 				Key:       "FAKTORY_BATCH_ID",
 				Value:     batch,
+				Sensitive: false,
+			})
+		}
+		faktoryProvider, faktoryProviderPresent := os.LookupEnv("FAKTORY_PROVIDER")
+		if faktoryProviderPresent {
+			job.Variables = append(job.Variables, opslevel.RunnerJobVariable{
+				Key:       "FAKTORY_PROVIDER",
+				Value:     faktoryProvider,
+				Sensitive: false,
+			})
+		}
+		faktoryUrl, faktoryUrlPresent := os.LookupEnv("FAKTORY_URL")
+		if faktoryUrlPresent {
+			job.Variables = append(job.Variables, opslevel.RunnerJobVariable{
+				Key:       "FAKTORY_URL",
+				Value:     faktoryUrl,
 				Sensitive: false,
 			})
 		}
