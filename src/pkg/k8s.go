@@ -137,6 +137,25 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 		Spec: corev1.PodSpec{
 			TerminationGracePeriodSeconds: &[]int64{5}[0],
 			RestartPolicy:                 corev1.RestartPolicyNever,
+			InitContainers: []corev1.Container{
+				{
+					Name:            "helper",
+					Image:           "public.ecr.aws/opslevel/opslevel-runner:v2023.9.29",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Command: []string{
+						"cp",
+						"/opslevel-runner",
+						"/mount/bin",
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "shared",
+							ReadOnly:  true,
+							MountPath: "/mount",
+						},
+					},
+				},
+			},
 			Containers: []corev1.Container{
 				{
 					Name:            "job",
@@ -164,6 +183,11 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 							ReadOnly:  true,
 							MountPath: "/opslevel",
 						},
+						{
+							Name:      "shared",
+							ReadOnly:  true,
+							MountPath: "/mount",
+						},
 					},
 				},
 			},
@@ -177,6 +201,12 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 							},
 							DefaultMode: executable(),
 						},
+					},
+				},
+				{
+					Name: "shared",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
 					},
 				},
 			},
