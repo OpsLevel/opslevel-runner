@@ -82,7 +82,7 @@ func readFaktoryJobInput() (*FaktoryJobDefinition, error) {
 		if jobFile == "." {
 			jobFile = "./job.yaml"
 		}
-		data, err := os.ReadFile("./job.yaml")
+		data, err := os.ReadFile(jobFile)
 		if err != nil {
 			return nil, err
 		}
