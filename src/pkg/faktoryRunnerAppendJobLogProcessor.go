@@ -23,7 +23,8 @@ type FaktoryAppendJobLogProcessor struct {
 	elapsed           time.Duration
 }
 
-func NewFaktoryAppendJobLogProcessor(client *faktory.Client, helper faktory_worker.Helper, logger zerolog.Logger, jobId opslevel.ID, maxBytes int, maxTime time.Duration) *FaktoryAppendJobLogProcessor {
+func NewFaktoryAppendJobLogProcessor(helper faktory_worker.Helper, logger zerolog.Logger, jobId opslevel.ID, maxBytes int, maxTime time.Duration) *FaktoryAppendJobLogProcessor {
+	client, _ := faktory.Open()
 	return &FaktoryAppendJobLogProcessor{
 		client:            client,
 		helper:            helper,

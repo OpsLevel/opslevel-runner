@@ -18,7 +18,8 @@ type FaktorySetOutcomeProcessor struct {
 	vars                   map[string]string
 }
 
-func NewFaktorySetOutcomeProcessor(client *faktory.Client, helper faktory_worker.Helper, logger zerolog.Logger, jobId opslevel.ID) *FaktorySetOutcomeProcessor {
+func NewFaktorySetOutcomeProcessor(helper faktory_worker.Helper, logger zerolog.Logger, jobId opslevel.ID) *FaktorySetOutcomeProcessor {
+	client, _ := faktory.Open()
 	return &FaktorySetOutcomeProcessor{
 		client:                 client,
 		helper:                 helper,

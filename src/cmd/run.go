@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	faktory "github.com/contribsys/faktory/client"
 	worker "github.com/contribsys/faktory_worker_go"
 	"os"
 	"strings"
@@ -229,8 +228,6 @@ func jobPoller(runnerId opslevel.ID, stop <-chan struct{}, jobQueue chan<- opsle
 }
 
 func runFaktory() {
-	client, err := faktory.Open()
-	cobra.CheckErr(err)
 	logMaxBytes := viper.GetInt("job-pod-log-max-size")
 	logMaxDuration := time.Duration(viper.GetInt("job-pod-log-max-interval")) * time.Second
 	logPrefix := func() string { return fmt.Sprintf("%s [%d] ", time.Now().UTC().Format(time.RFC3339), 0) }
@@ -294,10 +291,10 @@ func runFaktory() {
 
 		streamer := pkg.NewLogStreamer(
 			logger,
-			pkg.NewFaktorySetOutcomeProcessor(client, helper, logger, job.Id),
+			pkg.NewFaktorySetOutcomeProcessor(helper, logger, job.Id),
 			pkg.NewSanitizeLogProcessor(job.Variables),
 			pkg.NewPrefixLogProcessor(logPrefix),
-			pkg.NewFaktoryAppendJobLogProcessor(client, helper, logger, job.Id, logMaxBytes, logMaxDuration),
+			pkg.NewFaktoryAppendJobLogProcessor(helper, logger, job.Id, logMaxBytes, logMaxDuration),
 		)
 		pkg.MetricJobsProcessing.Inc()
 		jobStart := time.Now()
