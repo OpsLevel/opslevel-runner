@@ -37,7 +37,7 @@ func init() {
 	runCmd.Flags().Int("job-concurrency", 3, "The number jobs this runner will handle in parallel.")
 	runCmd.Flags().Int("poll-interval", 10, "The amount of time in seconds between API calls to find pending jobs.")
 	runCmd.Flags().Int("metrics-port", 10354, "The port on which to bind the metrics endpoint to.")
-	runCmd.Flags().Int("log-max-bytes", 1024000, "The max amount in bytes before job logs will be sent to OpsLevel.")
+	runCmd.Flags().Int("log-max-bytes", 512000, "The max amount in bytes before job logs will be sent to OpsLevel.")
 	runCmd.Flags().Int("log-max-time", 30, "The max amount of time in second before job logs will be sent to OpsLevel.")
 	viper.BindPFlags(runCmd.Flags())
 
