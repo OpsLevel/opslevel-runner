@@ -37,7 +37,7 @@ type JobConfig struct {
 }
 
 type JobRunner struct {
-	runnerId     opslevel.ID
+	runnerId     string
 	logger       zerolog.Logger
 	config       *rest.Config
 	clientset    *kubernetes.Clientset
@@ -59,7 +59,7 @@ type JobPodConfig struct {
 	MemLimit    int64 // in MB
 }
 
-func NewJobRunner(runnerId opslevel.ID, logger zerolog.Logger, config *rest.Config, clientset *kubernetes.Clientset, jobPodConfig JobPodConfig) *JobRunner {
+func NewJobRunner(runnerId string, logger zerolog.Logger, config *rest.Config, clientset *kubernetes.Clientset, jobPodConfig JobPodConfig) *JobRunner {
 	return &JobRunner{
 		runnerId:     runnerId,
 		logger:       logger,

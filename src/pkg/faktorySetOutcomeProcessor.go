@@ -13,18 +13,16 @@ type FaktorySetOutcomeProcessor struct {
 	client                 *faktory.Client
 	helper                 faktory_worker.Helper
 	logger                 zerolog.Logger
-	runnerId               opslevel.ID
 	jobId                  opslevel.ID
 	multilineOutcomeVarKey Stack[string]
 	vars                   map[string]string
 }
 
-func NewFaktorySetOutcomeProcessor(client *faktory.Client, helper faktory_worker.Helper, logger zerolog.Logger, runnerId opslevel.ID, jobId opslevel.ID) *FaktorySetOutcomeProcessor {
+func NewFaktorySetOutcomeProcessor(client *faktory.Client, helper faktory_worker.Helper, logger zerolog.Logger, jobId opslevel.ID) *FaktorySetOutcomeProcessor {
 	return &FaktorySetOutcomeProcessor{
 		client:                 client,
 		helper:                 helper,
 		logger:                 logger,
-		runnerId:               runnerId,
 		jobId:                  jobId,
 		multilineOutcomeVarKey: NewStack[string](""),
 		vars:                   map[string]string{},
@@ -82,8 +80,7 @@ func (s *FaktorySetOutcomeProcessor) Flush(outcome JobOutcome) {
 		})
 	}
 	payload := opslevel.RunnerReportJobOutcomeInput{
-		RunnerId:         opslevel.ID(s.runnerId),
-		RunnerJobId:      opslevel.ID(s.jobId),
+		RunnerJobId:      s.jobId,
 		Outcome:          outcome.Outcome,
 		OutcomeVariables: vars,
 	}

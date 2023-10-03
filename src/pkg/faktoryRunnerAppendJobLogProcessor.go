@@ -13,7 +13,6 @@ type FaktoryAppendJobLogProcessor struct {
 	client            *faktory.Client
 	helper            faktory_worker.Helper
 	logger            zerolog.Logger
-	runnerId          opslevel.ID
 	jobId             opslevel.ID
 	maxBytes          int
 	maxTime           time.Duration
@@ -24,12 +23,11 @@ type FaktoryAppendJobLogProcessor struct {
 	elapsed           time.Duration
 }
 
-func NewFaktoryAppendJobLogProcessor(client *faktory.Client, helper faktory_worker.Helper, logger zerolog.Logger, runnerId opslevel.ID, jobId opslevel.ID, maxBytes int, maxTime time.Duration) *FaktoryAppendJobLogProcessor {
+func NewFaktoryAppendJobLogProcessor(client *faktory.Client, helper faktory_worker.Helper, logger zerolog.Logger, jobId opslevel.ID, maxBytes int, maxTime time.Duration) *FaktoryAppendJobLogProcessor {
 	return &FaktoryAppendJobLogProcessor{
 		client:            client,
 		helper:            helper,
 		logger:            logger,
-		runnerId:          runnerId,
 		jobId:             jobId,
 		maxBytes:          maxBytes,
 		maxTime:           maxTime,
@@ -88,7 +86,6 @@ func (s *FaktoryAppendJobLogProcessor) Flush(outcome JobOutcome) {
 func (s *FaktoryAppendJobLogProcessor) submit() {
 	if len(s.logLines) > 0 {
 		job := faktory.NewJob("FaktoryRunnerAppendJobLog", opslevel.RunnerAppendJobLogInput{
-			RunnerId:    s.runnerId,
 			RunnerJobId: s.jobId,
 			SentAt:      opslevel.NewISO8601DateNow(),
 			Logs:        s.logLines,

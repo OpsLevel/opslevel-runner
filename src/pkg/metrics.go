@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/opslevel/opslevel-go/v2023"
-
 	"github.com/prometheus/client_golang/prometheus/collectors"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -51,8 +49,8 @@ func initMetrics(id string) {
 	})
 }
 
-func StartMetricsServer(id opslevel.ID, port int) {
-	initMetrics(string(id))
+func StartMetricsServer(id string, port int) {
+	initMetrics(id)
 	go func() {
 		mux := http.NewServeMux()
 		mux.Handle("/metrics", promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{})) // Uses a clean instrumentation free handler
