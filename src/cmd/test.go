@@ -43,8 +43,11 @@ func doTest(cmd *cobra.Command, args []string) error {
 		pkg.NewOpsLevelAppendLogProcessor(nil, log.Logger, "1", "1", "1", 1024000, 30*time.Second),
 	)
 	jobPodConfig := newJobPodConfig()
-	runner, err := pkg.NewJobRunner("1", log.Logger, jobPodConfig)
+	k8sConfig, err := pkg.GetKubernetesConfig()
 	cobra.CheckErr(err)
+	k8sClient, err := pkg.GetKubernetesClientset()
+	cobra.CheckErr(err)
+	runner := pkg.NewJobRunner("1", log.Logger, k8sConfig, k8sClient, jobPodConfig)
 
 	go streamer.Run()
 	outcome := runner.Run(*job, streamer.Stdout, streamer.Stderr)

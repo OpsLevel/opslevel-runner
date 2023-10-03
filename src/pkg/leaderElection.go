@@ -10,8 +10,6 @@ import (
 	"github.com/spf13/viper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/util/retry"
@@ -109,14 +107,4 @@ func getReplicaCount(runnerId opslevel.ID, currentReplicas int) (int32, error) {
 	maxReplicaCount := float64(viper.GetInt("runner-max-replicas"))
 	replicaCount := math.Max(math.Min(recommendedReplicaCount, maxReplicaCount), minReplicaCount)
 	return int32(replicaCount), nil
-}
-
-func GetKubernetesConfig() (*rest.Config, error) {
-	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
-	configOverrides := &clientcmd.ConfigOverrides{}
-	config, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides).ClientConfig()
-	if err != nil {
-		return nil, err
-	}
-	return config, nil
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	faktory "github.com/contribsys/faktory/client"
 	worker "github.com/contribsys/faktory_worker_go"
 	"os"
 	"strings"
@@ -48,28 +49,27 @@ func doRun(cmd *cobra.Command, args []string) {
 	defer sentry.Flush(2 * time.Second)
 	logVersion()
 
-	switch viper.GetString("mode") {
-	case "faktory":
-		runFaktory("faktory")
-	case "api":
+	client := pkg.NewGraphClient()
 
-		client := pkg.NewGraphClient()
+	runner, err := client.RunnerRegister()
+	pkg.CheckErr(err)
 
-		runner, err := client.RunnerRegister()
+	if viper.GetBool("scaling-enabled") {
+		config, err := pkg.GetKubernetesConfig()
 		pkg.CheckErr(err)
 
-		if viper.GetBool("scaling-enabled") {
-			config, err := pkg.GetKubernetesConfig()
-			pkg.CheckErr(err)
+		k8sClient := clientset.NewForConfigOrDie(config)
 
-			k8sClient := clientset.NewForConfigOrDie(config)
+		log.Info().Msgf("electing leader...")
+		go electLeader(k8sClient, runner.Id)
+	}
+	log.Info().Msgf("Starting runner for id '%s'", runner.Id)
+	pkg.StartMetricsServer(runner.Id, viper.GetInt("metrics-port"))
 
-			log.Info().Msgf("electing leader...")
-			go electLeader(k8sClient, runner.Id)
-		}
-
-		log.Info().Msgf("Starting runner for id '%s'", runner.Id)
-		pkg.StartMetricsServer(runner.Id, viper.GetInt("metrics-port"))
+	switch viper.GetString("mode") {
+	case "faktory":
+		runFaktory(runner.Id)
+	case "api":
 		stop := opslevel_common.InitSignalHandler()
 		wg := startWorkers(runner.Id, stop)
 		<-stop // Enter Forever Loop
@@ -115,10 +115,13 @@ func jobWorker(wg *sync.WaitGroup, index int, runnerId opslevel.ID, jobQueue <-c
 	logLevel := strings.ToLower(viper.GetString("log-level"))
 	logger := log.With().Int("worker", index).Logger()
 	client := pkg.NewGraphClient()
+	k8sConfig, err := pkg.GetKubernetesConfig()
+	cobra.CheckErr(err)
+	k8sClient, err := pkg.GetKubernetesClientset()
+	cobra.CheckErr(err)
 	tracer := pkg.GetTracer()
 	podConfig := newJobPodConfig()
-	runner, err := pkg.NewJobRunner(runnerId, logger, podConfig)
-	pkg.CheckErr(err)
+	runner := pkg.NewJobRunner(runnerId, logger, k8sConfig, k8sClient, podConfig)
 
 	logger.Info().Msgf("Starting job processor %d ...", index)
 	defer wg.Done()
@@ -223,15 +226,26 @@ func jobPoller(runnerId opslevel.ID, stop <-chan struct{}, jobQueue chan<- opsle
 	}
 }
 
-func runFaktory(runnerId string) {
+func runFaktory(runnerId opslevel.ID) {
+	client, err := faktory.Open()
+	cobra.CheckErr(err)
+	logMaxBytes := viper.GetInt("job-pod-log-max-size")
+	logMaxDuration := time.Duration(viper.GetInt("job-pod-log-max-interval")) * time.Second
 	logPrefix := func() string { return fmt.Sprintf("%s [%d] ", time.Now().UTC().Format(time.RFC3339), 0) }
 	logger := log.With().Int("faktory", 0).Logger()
 	podConfig := newJobPodConfig()
 
 	mgr := worker.NewManager()
 	mgr.Register("legacy", func(ctx context.Context, args ...interface{}) error {
-		helper := worker.HelperFor(ctx)
-		
+		config, err := pkg.GetKubernetesConfig()
+		if err != nil {
+			return err
+		}
+		clientset, err := pkg.GetKubernetesClientset()
+		if err != nil {
+			return err
+		}
+
 		var job opslevel.RunnerJob
 		data, err := json.Marshal(args[0])
 		if err != nil {
@@ -241,6 +255,8 @@ func runFaktory(runnerId string) {
 		if err != nil {
 			return err
 		}
+
+		helper := worker.HelperFor(ctx)
 
 		batch := helper.Bid()
 		if batch != "" {
@@ -270,35 +286,23 @@ func runFaktory(runnerId string) {
 		// TODO: add log processors that ships log chunks as jobs
 		streamer := pkg.NewLogStreamer(
 			logger,
+			pkg.NewFaktorySetOutcomeProcessor(client, helper, logger, runnerId, job.Id),
 			pkg.NewSanitizeLogProcessor(job.Variables),
 			pkg.NewPrefixLogProcessor(logPrefix),
 			pkg.NewLoggerLogProcessor(logger),
+			pkg.NewFaktoryAppendJobLogProcessor(client, helper, logger, runnerId, job.Id, logMaxBytes, logMaxDuration),
 		)
 		// TODO: add tracing and metrics telemetry
 		jobStart := time.Now()
 		go streamer.Run()
 
-		runner, err := pkg.NewJobRunner(opslevel.ID(runnerId), logger, podConfig)
-		pkg.CheckErr(err)
+		runner := pkg.NewJobRunner(runnerId, logger, config, clientset, podConfig)
 		outcome := runner.Run(job, streamer.Stdout, streamer.Stderr)
 		streamer.Flush(outcome)
 
 		jobDuration := time.Since(jobStart)
 		logger.Info().Msgf("Finished Job '%s' took '%s' and had outcome '%s'", job.Id, jobDuration, outcome.Outcome)
 
-		if outcome.Outcome != opslevel.RunnerJobOutcomeEnumSuccess {
-			return errors.New(outcome.Message)
-		}
-
-		// TODO: push outcome job onto the queue
-		//err = helper.Batch(func(b *faktory.Batch) error {
-		//	callback := faktory.NewJob("outcome", outcome)
-		//	callback.Queue = "outcomes"
-		//	return b.Push(callback)
-		//})
-		//if err != nil {
-		//	log.Error().Err(err).Msgf("failed push outcome jobs to batch")
-		//}
 		return nil
 	})
 	mgr.Concurrency = getConcurrency()

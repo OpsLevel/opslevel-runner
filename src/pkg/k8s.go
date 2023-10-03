@@ -59,22 +59,14 @@ type JobPodConfig struct {
 	MemLimit    int64 // in MB
 }
 
-func NewJobRunner(runnerId opslevel.ID, logger zerolog.Logger, jobPodConfig JobPodConfig) (*JobRunner, error) {
-	config, err := getKubernetesConfig()
-	if err != nil {
-		return nil, err
-	}
-	clientset, err := getKubernetesClientset()
-	if err != nil {
-		return nil, err
-	}
+func NewJobRunner(runnerId opslevel.ID, logger zerolog.Logger, config *rest.Config, clientset *kubernetes.Clientset, jobPodConfig JobPodConfig) *JobRunner {
 	return &JobRunner{
 		runnerId:     runnerId,
 		logger:       logger,
 		config:       config,
 		clientset:    clientset,
 		jobPodConfig: jobPodConfig,
-	}, nil
+	}
 }
 
 func (s *JobRunner) getPodEnv(configs []opslevel.RunnerJobVariable) []corev1.EnvVar {
@@ -293,8 +285,8 @@ func CreateLabelSelector(labels map[string]string) (*metav1.LabelSelector, error
 	return labelSelector, err
 }
 
-func getKubernetesClientset() (*kubernetes.Clientset, error) {
-	config, err := getKubernetesConfig()
+func GetKubernetesClientset() (*kubernetes.Clientset, error) {
+	config, err := GetKubernetesConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -306,7 +298,7 @@ func getKubernetesClientset() (*kubernetes.Clientset, error) {
 	return client, nil
 }
 
-func getKubernetesConfig() (*rest.Config, error) {
+func GetKubernetesConfig() (*rest.Config, error) {
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	configOverrides := &clientcmd.ConfigOverrides{}
 	config, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides).ClientConfig()
