@@ -286,14 +286,17 @@ func runFaktory() {
 				Sensitive: false,
 			})
 		}
+		job.Variables = append(job.Variables, opslevel.RunnerJobVariable{
+			Key:       "RUNNER_JOB_ID",
+			Value:     string(job.Id),
+			Sensitive: false,
+		})
 
-		// TODO: add log processors that ships log chunks as jobs
 		streamer := pkg.NewLogStreamer(
 			logger,
 			pkg.NewFaktorySetOutcomeProcessor(client, helper, logger, job.Id),
 			pkg.NewSanitizeLogProcessor(job.Variables),
 			pkg.NewPrefixLogProcessor(logPrefix),
-			pkg.NewLoggerLogProcessor(logger),
 			pkg.NewFaktoryAppendJobLogProcessor(client, helper, logger, job.Id, logMaxBytes, logMaxDuration),
 		)
 		pkg.MetricJobsProcessing.Inc()
