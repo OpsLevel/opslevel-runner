@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	worker "github.com/contribsys/faktory_worker_go"
+	"github.com/mitchellh/mapstructure"
 	"os"
 	"strings"
 	"sync"
@@ -227,6 +228,12 @@ func jobPoller(runnerId opslevel.ID, stop <-chan struct{}, jobQueue chan<- opsle
 	}
 }
 
+type MapStructureRunnerJobVariable struct {
+	Key       string `mapstructure:"key"`
+	Value     string `mapstructure:"value"`
+	Sensitive bool   `mapstructure:"sensitive"`
+}
+
 func runFaktory() {
 	logMaxBytes := viper.GetInt("job-pod-log-max-size")
 	logMaxDuration := time.Duration(viper.GetInt("job-pod-log-max-interval")) * time.Second
@@ -261,21 +268,23 @@ func runFaktory() {
 
 		jobID, ok := helper.Custom("opslevel-runner-job-id")
 		if ok {
-			job.Id = jobID.(opslevel.ID)
+			job.Id = opslevel.ID(jobID.(string))
 		}
 
 		extraVars, ok := helper.Custom("opslevel-runner-extra-vars")
 		if ok {
-			var parsedExtraVars []opslevel.RunnerJobVariable
-			data, err := json.Marshal(extraVars)
+			var castedVars []MapStructureRunnerJobVariable
+			err := mapstructure.Decode(extraVars, &castedVars)
 			if err != nil {
 				return err
 			}
-			err = json.Unmarshal(data, &extraVars)
-			if err != nil {
-				return err
+			for _, extraVar := range castedVars {
+				job.Variables = append(job.Variables, opslevel.RunnerJobVariable{
+					Key:       extraVar.Key,
+					Value:     extraVar.Value,
+					Sensitive: extraVar.Sensitive,
+				})
 			}
-			job.Variables = append(job.Variables, parsedExtraVars...)
 		}
 
 		batch := helper.Bid()
