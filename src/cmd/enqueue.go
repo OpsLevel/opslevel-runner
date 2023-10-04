@@ -22,6 +22,8 @@ type FaktoryJobDefinition struct {
 	UniqueFor   uint                `json:"unique_for"`
 	UniqueUntil faktory.UniqueUntil `json:"unique_until"`
 	ExpiresIn   int                 `json:"expires_in"`
+
+	Custom map[string]interface{} `json:"custom"`
 }
 
 var enqueueCmd = &cobra.Command{
@@ -48,6 +50,11 @@ var enqueueCmd = &cobra.Command{
 		}
 		if job.ExpiresIn > 0 {
 			j.SetExpiresIn(time.Duration(job.ExpiresIn) * time.Second)
+		}
+		if len(job.Custom) > 0 {
+			for key, value := range job.Custom {
+				j.SetCustom(key, value)
+			}
 		}
 
 		if job.Batch != "" {

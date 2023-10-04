@@ -259,6 +259,25 @@ func runFaktory() {
 
 		helper := worker.HelperFor(ctx)
 
+		jobID, ok := helper.Custom("opslevel-runner-job-id")
+		if ok {
+			job.Id = jobID.(opslevel.ID)
+		}
+
+		extraVars, ok := helper.Custom("opslevel-runner-extra-vars")
+		if ok {
+			var parsedExtraVars []opslevel.RunnerJobVariable
+			data, err := json.Marshal(extraVars)
+			if err != nil {
+				return err
+			}
+			err = json.Unmarshal(data, &extraVars)
+			if err != nil {
+				return err
+			}
+			job.Variables = append(job.Variables, parsedExtraVars...)
+		}
+
 		batch := helper.Bid()
 		if batch != "" {
 			job.Variables = append(job.Variables, opslevel.RunnerJobVariable{
