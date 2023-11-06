@@ -13,7 +13,7 @@ require (
 	github.com/prometheus/client_golang v1.16.0
 	github.com/rocktavious/autopilot v0.1.5
 	github.com/rs/zerolog v1.30.0
-	github.com/spf13/cobra v1.7.0
+	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.17.0
 	go.opentelemetry.io/otel v1.15.1
 	go.opentelemetry.io/otel/trace v1.15.1
