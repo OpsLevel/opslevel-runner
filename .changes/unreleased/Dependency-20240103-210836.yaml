@@ -1,0 +1,4 @@
+kind: "Dependency"
+body: "Bump actions/setup-go from 4 to 5"
+time: 2024-01-03T21:08:36.00000Z
+
