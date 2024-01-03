@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/opslevel/opslevel-go/v2023"
-	"github.com/rocktavious/autopilot"
+	"github.com/rocktavious/autopilot/v2023"
 )
 
 func TestSanitizeLogProcessor(t *testing.T) {

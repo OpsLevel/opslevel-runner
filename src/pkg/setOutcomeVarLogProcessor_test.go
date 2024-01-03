@@ -3,7 +3,7 @@ package pkg
 import (
 	"testing"
 
-	"github.com/rocktavious/autopilot"
+	"github.com/rocktavious/autopilot/v2023"
 	"github.com/rs/zerolog/log"
 )
 
