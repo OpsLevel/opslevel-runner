@@ -40,7 +40,7 @@ func (s *LogStreamer) AddProcessor(processor LogProcessor) {
 }
 
 func (s *LogStreamer) GetLogBuffer() []string {
-	output := []string{}
+	output := make([]string, 0)
 	s.logBuffer.Do(func(line any) {
 		if line != nil {
 			output = append(output, line.(string))
