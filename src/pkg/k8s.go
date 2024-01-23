@@ -332,7 +332,8 @@ func (s *JobRunner) ExecWithConfig(config JobConfig) error {
 	if err != nil {
 		return err
 	}
-	return exec.Stream(remotecommand.StreamOptions{
+	// TODO: use a real context here
+	return exec.StreamWithContext(context.TODO(), remotecommand.StreamOptions{
 		Stdin:  config.Stdin,
 		Stdout: config.Stdout,
 		Stderr: config.Stderr,
@@ -369,7 +370,8 @@ func (s *JobRunner) CreatePod(config *corev1.Pod) (*corev1.Pod, error) {
 
 func (s *JobRunner) WaitForPod(podConfig *corev1.Pod, timeout time.Duration) error {
 	s.logger.Debug().Msgf("Waiting for pod %s/%s to be ready in %s ...", podConfig.Namespace, podConfig.Name, timeout)
-	return wait.PollImmediate(time.Second, timeout, func() (bool, error) {
+	immediate := true // TODO: find out what value should go here
+	return wait.PollUntilContextTimeout(context.TODO(), time.Second, timeout, immediate, func(ctx context.Context) (bool, error) {
 		pod, err := s.clientset.CoreV1().Pods(podConfig.Namespace).Get(context.TODO(), podConfig.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
