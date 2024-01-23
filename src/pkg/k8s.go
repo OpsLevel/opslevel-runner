@@ -370,8 +370,8 @@ func (s *JobRunner) CreatePod(config *corev1.Pod) (*corev1.Pod, error) {
 
 func (s *JobRunner) WaitForPod(podConfig *corev1.Pod, timeout time.Duration) error {
 	s.logger.Debug().Msgf("Waiting for pod %s/%s to be ready in %s ...", podConfig.Namespace, podConfig.Name, timeout)
-	return wait.PollUntilContextTimeout(context.TODO(), time.Second, timeout, true, func(ctx context.Context) (bool, error) {
-		pod, err := s.clientset.CoreV1().Pods(podConfig.Namespace).Get(ctx, podConfig.Name, metav1.GetOptions{})
+	return wait.PollImmediate(time.Second, timeout, func() (bool, error) {
+		pod, err := s.clientset.CoreV1().Pods(podConfig.Namespace).Get(context.TODO(), podConfig.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
