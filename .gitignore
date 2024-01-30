@@ -20,3 +20,5 @@
 
 # Default go build output
 src/opslevel-runner
+src/go.work**
+**coverage.txt

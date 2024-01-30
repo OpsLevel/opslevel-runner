@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	worker "github.com/contribsys/faktory_worker_go"
-	"github.com/mitchellh/mapstructure"
 	"os"
 	"strings"
 	"sync"
 	"time"
+
+	worker "github.com/contribsys/faktory_worker_go"
+	"github.com/mitchellh/mapstructure"
 
 	"github.com/getsentry/sentry-go"
 	opslevel_common "github.com/opslevel/opslevel-common/v2022"

@@ -2,11 +2,12 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"time"
+
 	faktory "github.com/contribsys/faktory/client"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
-	"os"
-	"time"
 )
 
 type FaktoryJobDefinition struct {
