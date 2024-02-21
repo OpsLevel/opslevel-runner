@@ -12,7 +12,7 @@ require (
 	github.com/opslevel/opslevel-go/v2023 v2023.12.14
 	github.com/prometheus/client_golang v1.18.0
 	github.com/rocktavious/autopilot/v2023 v2023.12.7
-	github.com/rs/zerolog v1.31.0
+	github.com/rs/zerolog v1.32.0
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.18.2
 	go.opentelemetry.io/otel v1.15.1
