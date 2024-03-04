@@ -21,7 +21,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/remotecommand"
 
-	"github.com/opslevel/opslevel-go/v2023"
+	"github.com/opslevel/opslevel-go/v2024"
 	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
 )
@@ -90,7 +90,7 @@ func (s *JobRunner) getConfigMapObject(identifier string, job opslevel.RunnerJob
 			Name:      identifier,
 			Namespace: s.jobPodConfig.Namespace,
 		},
-		Immutable: opslevel.Bool(true),
+		Immutable: opslevel.RefOf(true),
 		Data:      data,
 	}
 }
@@ -131,7 +131,8 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 			RestartPolicy:                 corev1.RestartPolicyNever,
 			InitContainers: []corev1.Container{
 				{
-					Name:            "helper",
+					Name: "helper",
+					// NOTE: update image?
 					Image:           "public.ecr.aws/opslevel/opslevel-runner:v2023.9.29",
 					ImagePullPolicy: corev1.PullIfNotPresent,
 					Command: []string{

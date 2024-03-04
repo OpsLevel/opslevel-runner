@@ -20,7 +20,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	clientset "k8s.io/client-go/kubernetes"
 
-	"github.com/opslevel/opslevel-go/v2023"
+	"github.com/opslevel/opslevel-go/v2024"
 	"github.com/opslevel/opslevel-runner/pkg"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -73,6 +73,7 @@ func doRun(cmd *cobra.Command, args []string) {
 			go electLeader(k8sClient, runner.Id)
 		}
 
+		// TODO: Need to remove opslevel_common dependency
 		stop := opslevel_common.InitSignalHandler()
 		wg := startWorkers(runner.Id, stop)
 		<-stop // Enter Forever Loop
