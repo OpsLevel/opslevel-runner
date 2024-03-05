@@ -4,7 +4,7 @@ import (
 	"encoding/base64"
 	"time"
 
-	"github.com/opslevel/opslevel-go/v2023"
+	"github.com/opslevel/opslevel-go/v2024"
 	"github.com/rs/zerolog"
 )
 
