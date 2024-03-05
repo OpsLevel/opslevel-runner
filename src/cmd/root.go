@@ -21,9 +21,10 @@ var rootCmd = &cobra.Command{
 	Long:  `Opslevel Runner`,
 }
 
-func Execute(v string, c string) {
+func Execute(v, c, d string) {
 	version = v
 	commit = c
+	date = d
 	pkg.SetClientVersion(version)
 	cobra.CheckErr(rootCmd.Execute())
 }

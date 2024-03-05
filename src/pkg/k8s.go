@@ -26,6 +26,8 @@ import (
 	"github.com/spf13/viper"
 )
 
+var ImageTagVersion string
+
 type JobConfig struct {
 	Command       []string
 	Namespace     string
@@ -131,9 +133,8 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 			RestartPolicy:                 corev1.RestartPolicyNever,
 			InitContainers: []corev1.Container{
 				{
-					Name: "helper",
-					// NOTE: update image?
-					Image:           "public.ecr.aws/opslevel/opslevel-runner:v2023.9.29",
+					Name:            "helper",
+					Image:           fmt.Sprintf("public.ecr.aws/opslevel/opslevel-runner:v%s", ImageTagVersion),
 					ImagePullPolicy: corev1.PullIfNotPresent,
 					Command: []string{
 						"cp",

@@ -20,6 +20,7 @@ type Build struct {
 
 type OpslevelVersion struct {
 	Commit  string `json:"app_commit,omitempty"`
+	Date    string `json:"app_date,omitempty"`
 	Version string `json:"app_version,omitempty"`
 }
 
@@ -33,6 +34,7 @@ type GoInfo struct {
 var (
 	version = "development"
 	commit  = "none"
+	date    = "unknown"
 	build   Build
 )
 
@@ -58,7 +60,7 @@ func getGoInfo() GoInfo {
 }
 
 func getOpslevelVersion() OpslevelVersion {
-	opslevelVersion := OpslevelVersion{}
+	opslevelVersion := OpslevelVersion{Date: date}
 	_, err := pkg.NewRestClient().R().SetResult(&opslevelVersion).Get("api/ping")
 	cobra.CheckErr(err)
 
@@ -82,7 +84,12 @@ func init() {
 
 func logVersion() {
 	initBuild()
-	log.Info().Msgf("Runner Version: %s-%s", build.OpslevelVersion.Version, build.OpslevelVersion.Commit)
+	log.Info().Msgf(
+		"Runner Version: %s-%s-%s",
+		build.OpslevelVersion.Version,
+		build.OpslevelVersion.Commit,
+		build.OpslevelVersion.Date,
+	)
 }
 
 func runVersion(cmd *cobra.Command, args []string) error {
