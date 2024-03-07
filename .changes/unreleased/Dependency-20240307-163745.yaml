@@ -1,0 +1,4 @@
+kind: "Dependency"
+body: "Bump go.opentelemetry.io/otel/trace from 1.23.1 to 1.24.0 in /src"
+time: 2024-03-07T16:37:45.00000Z
+
