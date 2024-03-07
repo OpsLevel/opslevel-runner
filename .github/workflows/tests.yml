@@ -25,13 +25,13 @@ jobs:
         uses: arduino/setup-task@v2
         with:
           version: 3.x
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          repo-token: ${{ secrets.ORG_GITHUB_TOKEN }}
       - name: Run quality checks and test code
         run: task ci
       - name: Upload Coverage
         uses: codecov/codecov-action@v4
         with:
-          token: ${{ secrets.CODECOV_UPLOAD_TOKEN }}
+          token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.txt
           fail_ci_if_error: false
           verbose: true
