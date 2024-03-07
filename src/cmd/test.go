@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/opslevel/opslevel-go/v2024"
@@ -27,7 +29,7 @@ func init() {
 }
 
 func doTest(cmd *cobra.Command, args []string) error {
-	job, err := readRunnerInput()
+	job, err := readJobInput()
 	if err != nil {
 		return err
 	}
@@ -56,4 +58,28 @@ func doTest(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf(outcome.Message)
 	}
 	return nil
+}
+
+func readJobInput() (*opslevel.RunnerJob, error) {
+	if jobFile == "" {
+		return nil, fmt.Errorf("please specify a job file")
+	}
+	if jobFile == "-" {
+		viper.SetConfigType("yaml")
+		viper.ReadConfig(os.Stdin)
+	} else if jobFile == "." {
+		viper.SetConfigFile("./job.yaml")
+	} else {
+		viper.SetConfigFile(jobFile)
+	}
+	err := viper.ReadInConfig()
+	if err != nil {
+		var configFileNotFoundError viper.ConfigFileNotFoundError
+		if !errors.As(err, &configFileNotFoundError) {
+			return nil, err
+		}
+	}
+	job := &opslevel.RunnerJob{}
+	viper.Unmarshal(&job)
+	return job, nil
 }

@@ -1,10 +1,13 @@
 package cmd
 
 import (
+	"fmt"
+	"os"
 	"time"
 
 	faktory "github.com/contribsys/faktory/client"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 type FaktoryJobDefinition struct {
@@ -70,4 +73,31 @@ var enqueueCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(enqueueCmd)
 	enqueueCmd.Flags().StringVarP(&jobFile, "file", "f", ".", "File to read data from. If '-' then reads from stdin. Defaults to read from './job.yaml'")
+}
+
+func readFaktoryJobInput() (*FaktoryJobDefinition, error) {
+	if jobFile == "" {
+		return nil, fmt.Errorf("please specify a job file")
+	}
+
+	var job FaktoryJobDefinition
+
+	if jobFile == "-" {
+		if err := yaml.NewDecoder(os.Stdin).Decode(&job); err != nil {
+			return nil, err
+		}
+	} else {
+		if jobFile == "." {
+			jobFile = "./job.yaml"
+		}
+		data, err := os.ReadFile(jobFile)
+		if err != nil {
+			return nil, err
+		}
+		if err := yaml.Unmarshal(data, &job); err != nil {
+			return nil, err
+		}
+	}
+
+	return &job, nil
 }
