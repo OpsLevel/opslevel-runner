@@ -57,6 +57,9 @@ func StartMetricsServer(id string, port int) {
 		prometheus.Unregister(collectors.NewGoCollector())                                              // Unregisters the go metrics
 		prometheusAddress := fmt.Sprintf(":%d", port)
 		log.Info().Msgf("Starting metrics service on '%s/metrics'", prometheusAddress)
-		http.ListenAndServe(prometheusAddress, mux)
+		err := http.ListenAndServe(prometheusAddress, mux)
+		if err != nil {
+			log.Error().Err(err).Msgf("metrics service returned error")
+		}
 	}()
 }
