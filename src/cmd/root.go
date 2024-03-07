@@ -90,19 +90,19 @@ func newJobPodConfig() pkg.JobPodConfig {
 }
 
 func initConfig() {
-	readConfig()
+	err := readConfig()
+	cobra.CheckErr(err)
 	setupLogging()
 	if value, present := os.LookupEnv("SENTRY_DSN"); present {
 		setupSentry(value)
 	}
 }
 
-func readConfig() {
+func readConfig() error {
 	if cfgFile != "" {
 		if cfgFile == "." {
 			viper.SetConfigType("yaml")
-			viper.ReadConfig(os.Stdin)
-			return
+			return viper.ReadConfig(os.Stdin)
 		} else {
 			viper.SetConfigFile(cfgFile)
 		}
@@ -117,7 +117,7 @@ func readConfig() {
 	}
 	viper.SetEnvPrefix("OPSLEVEL")
 	viper.AutomaticEnv()
-	viper.ReadInConfig()
+	return viper.ReadInConfig()
 }
 
 func setupLogging() {

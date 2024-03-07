@@ -22,3 +22,6 @@
 src/opslevel-runner
 src/go.work**
 **coverage.txt
+
+# ignore any user-created yaml files that may have been used for tophatting.
+src/*.yaml

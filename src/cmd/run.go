@@ -78,7 +78,10 @@ func doRun(cmd *cobra.Command, args []string) {
 		log.Info().Msgf("interupt - waiting for jobs to complete ...")
 		wg.Wait()
 		log.Info().Msgf("Unregister runner for id '%s'...", runner.Id)
-		client.RunnerUnregister(runner.Id)
+		err = client.RunnerUnregister(runner.Id)
+		if err != nil {
+			log.Error().Err(err).Msgf("received error while unregistering runner")
+		}
 	}
 }
 
@@ -342,6 +345,9 @@ func runFaktory() {
 	mgr.Concurrency = getConcurrency()
 	mgr.ProcessStrictPriorityQueues(viper.GetStringSlice("queues")...)
 	logger.Info().Msgf("Starting faktory worker")
-	mgr.Run() // blocking
+	err := mgr.Run() // blocking
+	if err != nil {
+		logger.Error().Err(err).Msgf("faktory worker returned error")
+	}
 	logger.Info().Msgf("Stopping faktory worker")
 }

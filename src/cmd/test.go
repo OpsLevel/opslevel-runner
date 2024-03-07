@@ -66,7 +66,10 @@ func readJobInput() (*opslevel.RunnerJob, error) {
 	}
 	if jobFile == "-" {
 		viper.SetConfigType("yaml")
-		viper.ReadConfig(os.Stdin)
+		err := viper.ReadConfig(os.Stdin)
+		if err != nil {
+			return nil, err
+		}
 	} else if jobFile == "." {
 		viper.SetConfigFile("./job.yaml")
 	} else {
@@ -80,6 +83,9 @@ func readJobInput() (*opslevel.RunnerJob, error) {
 		}
 	}
 	job := &opslevel.RunnerJob{}
-	viper.Unmarshal(&job)
+	err = viper.Unmarshal(&job)
+	if err != nil {
+		return nil, err
+	}
 	return job, nil
 }

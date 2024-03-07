@@ -1,5 +1,8 @@
 run:
   timeout: 2m
-linters:
-  disable:
-    - errcheck
+linters-settings:
+  errcheck:
+    exclude-functions:
+      - (*github.com/spf13/pflag.PFlagSet).GetString
+      - github.com/spf13/viper.BindEnv
+      - github.com/spf13/viper.BindPFlags

@@ -384,17 +384,26 @@ func (s *JobRunner) WaitForPod(podConfig *corev1.Pod, timeout time.Duration) err
 	})
 }
 
-func (s *JobRunner) DeleteConfigMap(config *corev1.ConfigMap) error {
+func (s *JobRunner) DeleteConfigMap(config *corev1.ConfigMap) {
 	s.logger.Trace().Msgf("Deleting configmap %s/%s ...", config.Namespace, config.Name)
-	return s.clientset.CoreV1().ConfigMaps(config.Namespace).Delete(context.TODO(), config.Name, metav1.DeleteOptions{})
+	err := s.clientset.CoreV1().ConfigMaps(config.Namespace).Delete(context.TODO(), config.Name, metav1.DeleteOptions{})
+	if err != nil {
+		s.logger.Error().Err(err).Msgf("received error on ConfigMap deletion")
+	}
 }
 
-func (s *JobRunner) DeletePDB(config *policyv1.PodDisruptionBudget) error {
+func (s *JobRunner) DeletePDB(config *policyv1.PodDisruptionBudget) {
 	s.logger.Trace().Msgf("Deleting configmap %s/%s ...", config.Namespace, config.Name)
-	return s.clientset.PolicyV1().PodDisruptionBudgets(config.Namespace).Delete(context.TODO(), config.Name, metav1.DeleteOptions{})
+	err := s.clientset.PolicyV1().PodDisruptionBudgets(config.Namespace).Delete(context.TODO(), config.Name, metav1.DeleteOptions{})
+	if err != nil {
+		s.logger.Error().Err(err).Msgf("received error on PDB deletion")
+	}
 }
 
-func (s *JobRunner) DeletePod(config *corev1.Pod) error {
+func (s *JobRunner) DeletePod(config *corev1.Pod) {
 	s.logger.Trace().Msgf("Deleting pod %s/%s ...", config.Namespace, config.Name)
-	return s.clientset.CoreV1().Pods(config.Namespace).Delete(context.TODO(), config.Name, metav1.DeleteOptions{})
+	err := s.clientset.CoreV1().Pods(config.Namespace).Delete(context.TODO(), config.Name, metav1.DeleteOptions{})
+	if err != nil {
+		s.logger.Error().Err(err).Msgf("received error on Pod deletion")
+	}
 }
