@@ -14,7 +14,6 @@ import (
 	"github.com/mitchellh/mapstructure"
 
 	"github.com/getsentry/sentry-go"
-	opslevel_common "github.com/opslevel/opslevel-common/v2022"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
@@ -73,8 +72,7 @@ func doRun(cmd *cobra.Command, args []string) {
 			go electLeader(k8sClient, runner.Id)
 		}
 
-		// TODO: Need to remove opslevel_common dependency
-		stop := opslevel_common.InitSignalHandler()
+		stop := pkg.InitSignalHandler()
 		wg := startWorkers(runner.Id, stop)
 		<-stop // Enter Forever Loop
 		log.Info().Msgf("interupt - waiting for jobs to complete ...")
@@ -197,7 +195,7 @@ func jobPoller(runnerId opslevel.ID, stop <-chan struct{}, jobQueue chan<- opsle
 	logger := log.With().Int("worker", 0).Logger()
 	client := pkg.NewGraphClient()
 	token := opslevel.ID("")
-	poll_wait_time := time.Second * time.Duration(viper.GetInt("poll-interval"))
+	pollWaitTime := time.Second * time.Duration(viper.GetInt("poll-interval"))
 	logger.Info().Msg("Starting polling for jobs")
 	for {
 		select {
@@ -207,25 +205,25 @@ func jobPoller(runnerId opslevel.ID, stop <-chan struct{}, jobQueue chan<- opsle
 			return
 		default:
 			logger.Trace().Msg("Polling for jobs ...")
-			continue_polling := true
-			for continue_polling {
+			continuePolling := true
+			for continuePolling {
 				logger.Debug().Msgf("Get pending jobs with lastUpdateToken '%v' ...", token)
 				job, nextToken, err := client.RunnerGetPendingJob(runnerId, token)
 				if err != nil {
 					logger.Error().Err(err).Msg("got error when getting pending job")
-					continue_polling = false
+					continuePolling = false
 				} else {
 					token = nextToken
 					if job.Id == "" {
-						continue_polling = false
+						continuePolling = false
 					} else {
 						logger.Debug().Msgf("Enqueuing job '%s'", job.Number())
 						jobQueue <- *job
 					}
 				}
 			}
-			logger.Trace().Msgf("Finished Polling for jobs sleeping for %s ...", poll_wait_time)
-			time.Sleep(poll_wait_time)
+			logger.Trace().Msgf("Finished Polling for jobs sleeping for %s ...", pollWaitTime)
+			time.Sleep(pollWaitTime)
 		}
 	}
 }
@@ -251,7 +249,7 @@ func runFaktory() {
 		if err != nil {
 			return err
 		}
-		clientset, err := pkg.GetKubernetesClientset()
+		localClientset, err := pkg.GetKubernetesClientset()
 		if err != nil {
 			return err
 		}
@@ -330,7 +328,7 @@ func runFaktory() {
 		jobStart := time.Now()
 		go streamer.Run()
 
-		runner := pkg.NewJobRunner("faktory", logger, config, clientset, podConfig)
+		runner := pkg.NewJobRunner("faktory", logger, config, localClientset, podConfig)
 		outcome := runner.Run(job, streamer.Stdout, streamer.Stderr)
 		streamer.Flush(outcome)
 

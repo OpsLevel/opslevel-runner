@@ -22,12 +22,12 @@ OpsLevel Runner is the Kubernetes based job processor for [OpsLevel](https://www
 
 ### Metrics
 
-| Name                            | Type        | Description                                                   |
-|---------------------------------|-------------|---------------------------------------------------------------|
-| opslevel_runner_jobs_duration   | `histogram` | The duration of jobs in seconds.                              |
-| opslevel_runner_jobs_finished   | `counter`   | The count of jobs that finished processing by outcome status. |
-| opslevel_runner_jobs_processing | `gauge`     | The current number of active jobs being processed.            |
-| opslevel_runner_jobs_started    | `counter`   | The count of jobs that started processing.                    |
+| Name | Type | Description |
+| --- | --- | --- |
+| opslevel_runner_jobs_duration | `histogram` | The duration of jobs in seconds. |
+| opslevel_runner_jobs_finished | `counter` | The count of jobs that finished processing by outcome status. |
+| opslevel_runner_jobs_processing | `gauge` | The current number of active jobs being processed. |
+| opslevel_runner_jobs_started | `counter` | The count of jobs that started processing. |
 
 
 ### Commands
@@ -71,7 +71,7 @@ Running
 # Production
 OPSLEVEL_API_TOKEN=XXXXX go run main.go run 
 # Staging
-OPSLEVEL_API_TOKEN=XXXXX go run main.go run --api-url=https://staging.opslevel.dev/graphql --app-url=https://staging.opslevel.dev
+OPSLEVEL_API_TOKEN=XXXXX go run main.go run --api-url=https://api.opslevel-staging.com/graphql --app-url=https://app.opslevel-staging.com  
 ```
 
 ## Running
