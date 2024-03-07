@@ -1,18 +1,18 @@
 <p align="center">
-    <a href="https://github.com/OpsLevel/opslevel-runner/blob/main/LICENSE" alt="License">
-        <img src="https://img.shields.io/github/license/OpsLevel/opslevel-runner.svg" /></a>
-    <a href="https://goreportcard.com/report/github.com/OpsLevel/opslevel-runner" alt="Go Report Card">
-        <img src="https://goreportcard.com/badge/github.com/OpsLevel/opslevel-runner" /></a>
-    <a href="https://GitHub.com/OpsLevel/opslevel-runner/releases/" alt="Release">
-        <img src="https://img.shields.io/github/v/release/OpsLevel/opslevel-runner" /></a>  
-    <a href="https://masterminds.github.io/stability/experimental.html" alt="Stability: Experimental">
-        <img src="https://masterminds.github.io/stability/experimental.svg" /></a>  
-    <a href="https://github.com/OpsLevel/opslevel-runner/graphs/contributors" alt="Contributors">
-        <img src="https://img.shields.io/github/contributors/OpsLevel/opslevel-runner" /></a>
-    <a href="https://github.com/OpsLevel/opslevel-runner/pulse" alt="Activity">
-        <img src="https://img.shields.io/github/commit-activity/m/OpsLevel/opslevel-runner" /></a>
-    <a href="https://github.com/OpsLevel/opslevel-runner/releases" alt="Downloads">
-        <img src="https://img.shields.io/github/downloads/OpsLevel/opslevel-runner/total" /></a>
+    <a href="https://github.com/OpsLevel/opslevel-runner/blob/main/LICENSE">
+        <img src="https://img.shields.io/github/license/OpsLevel/opslevel-runner.svg" alt="License" /></a>
+    <a href="https://goreportcard.com/report/github.com/OpsLevel/opslevel-runner">
+        <img src="https://goreportcard.com/badge/github.com/OpsLevel/opslevel-runner" alt="Go Report Card" /></a>
+    <a href="https://GitHub.com/OpsLevel/opslevel-runner/releases/">
+        <img src="https://img.shields.io/github/v/release/OpsLevel/opslevel-runner" alt="Release" /></a>
+    <a href="https://masterminds.github.io/stability/experimental.html">
+        <img src="https://masterminds.github.io/stability/experimental.svg" alt="Stability: Experimental" /></a>
+    <a href="https://github.com/OpsLevel/opslevel-runner/graphs/contributors">
+        <img src="https://img.shields.io/github/contributors/OpsLevel/opslevel-runner" alt="Contributors" /></a>
+    <a href="https://github.com/OpsLevel/opslevel-runner/pulse">
+        <img src="https://img.shields.io/github/commit-activity/m/OpsLevel/opslevel-runner" alt="Activity" /></a>
+    <a href="https://github.com/OpsLevel/opslevel-runner/releases">
+        <img src="https://img.shields.io/github/downloads/OpsLevel/opslevel-runner/total" alt="Downloads" /></a>
 </p>
 
 [![Overall](https://img.shields.io/endpoint?style=flat&url=https%3A%2F%2Fapp.opslevel.com%2Fapi%2Fservice_level%2FjcZ9Qt0e3fce3G6Xbo767Z2tXbKKKZ6qsRGzHZWwRME)](https://app.opslevel.com/services/opslevel_runner/maturity-report)
@@ -22,12 +22,12 @@ OpsLevel Runner is the Kubernetes based job processor for [OpsLevel](https://www
 
 ### Metrics
 
-| Name | Type | Description |
-| --- | --- | --- |
-| opslevel_runner_jobs_duration | `histogram` | The duration of jobs in seconds. |
-| opslevel_runner_jobs_finished | `counter` | The count of jobs that finished processing by outcome status. |
-| opslevel_runner_jobs_processing | `gauge` | The current number of active jobs being processed. |
-| opslevel_runner_jobs_started | `counter` | The count of jobs that started processing. |
+| Name                            | Type        | Description                                                   |
+|---------------------------------|-------------|---------------------------------------------------------------|
+| opslevel_runner_jobs_duration   | `histogram` | The duration of jobs in seconds.                              |
+| opslevel_runner_jobs_finished   | `counter`   | The count of jobs that finished processing by outcome status. |
+| opslevel_runner_jobs_processing | `gauge`     | The current number of active jobs being processed.            |
+| opslevel_runner_jobs_started    | `counter`   | The count of jobs that started processing.                    |
 
 
 ### Commands

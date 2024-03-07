@@ -82,7 +82,7 @@ func (s *SetOutcomeVarLogProcessor) ProcessStderr(line string) string {
 }
 
 func (s *SetOutcomeVarLogProcessor) Flush(outcome JobOutcome) {
-	vars := []opslevel.RunnerJobOutcomeVariable{}
+	vars := make([]opslevel.RunnerJobOutcomeVariable, 0)
 	for k, v := range s.vars {
 		vars = append(vars, opslevel.RunnerJobOutcomeVariable{
 			Key:   k,
@@ -101,8 +101,8 @@ func (s *SetOutcomeVarLogProcessor) Flush(outcome JobOutcome) {
 	}
 
 	err := s.client.RunnerReportJobOutcome(opslevel.RunnerReportJobOutcomeInput{
-		RunnerId:         opslevel.ID(s.runnerId),
-		RunnerJobId:      opslevel.ID(s.jobId),
+		RunnerId:         s.runnerId,
+		RunnerJobId:      s.jobId,
 		Outcome:          outcome.Outcome,
 		OutcomeVariables: vars,
 	})

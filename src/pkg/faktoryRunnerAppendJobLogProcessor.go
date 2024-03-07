@@ -5,14 +5,14 @@ import (
 	"time"
 
 	faktory "github.com/contribsys/faktory/client"
-	faktory_worker "github.com/contribsys/faktory_worker_go"
+	faktoryWorker "github.com/contribsys/faktory_worker_go"
 	"github.com/opslevel/opslevel-go/v2024"
 	"github.com/rs/zerolog"
 )
 
 type FaktoryAppendJobLogProcessor struct {
 	client            *faktory.Client
-	helper            faktory_worker.Helper
+	helper            faktoryWorker.Helper
 	logger            zerolog.Logger
 	jobId             opslevel.ID
 	maxBytes          int
@@ -24,7 +24,7 @@ type FaktoryAppendJobLogProcessor struct {
 	elapsed           time.Duration
 }
 
-func NewFaktoryAppendJobLogProcessor(helper faktory_worker.Helper, logger zerolog.Logger, jobId opslevel.ID, maxBytes int, maxTime time.Duration) *FaktoryAppendJobLogProcessor {
+func NewFaktoryAppendJobLogProcessor(helper faktoryWorker.Helper, logger zerolog.Logger, jobId opslevel.ID, maxBytes int, maxTime time.Duration) *FaktoryAppendJobLogProcessor {
 	client, _ := faktory.Open()
 	return &FaktoryAppendJobLogProcessor{
 		client:            client,

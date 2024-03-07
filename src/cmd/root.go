@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
@@ -30,7 +31,7 @@ func Execute(v, c, d string) {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "./opslevel.yaml", "configuration options for the runner")
+	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "configuration options for the runner")
 	rootCmd.PersistentFlags().String("api-url", "https://api.opslevel.com", "The OpsLevel API Url. Overrides environment variable 'OPSLEVEL_API_URL'")
 	rootCmd.PersistentFlags().String("api-token", "", "The OpsLevel API Token. Overrides environment variable 'OPSLEVEL_API_TOKEN'")
 	rootCmd.PersistentFlags().String("log-format", "TEXT", "overrides environment variable 'OPSLEVEL_LOG_FORMAT' (options [\"JSON\", \"TEXT\"])")
@@ -90,34 +91,45 @@ func newJobPodConfig() pkg.JobPodConfig {
 }
 
 func initConfig() {
-	readConfig()
+	err := readConfig()
+	cobra.CheckErr(err)
+	setupEnv()
 	setupLogging()
 	if value, present := os.LookupEnv("SENTRY_DSN"); present {
 		setupSentry(value)
 	}
 }
 
-func readConfig() {
-	if cfgFile != "" {
-		if cfgFile == "." {
-			viper.SetConfigType("yaml")
-			viper.ReadConfig(os.Stdin)
-			return
-		} else {
-			viper.SetConfigFile(cfgFile)
-		}
-	} else {
-		home, err := os.UserHomeDir()
-		cobra.CheckErr(err)
+func isStdInFromTerminal() bool {
+	fi, _ := os.Stdin.Stat()
+	return fi.Mode()&os.ModeCharDevice != 0
+}
 
-		viper.SetConfigName("opslevel")
-		viper.SetConfigType("yaml")
+func readConfig() error {
+	viper.SetConfigType("yaml")
+	switch cfgFile {
+	case "-":
+		if isStdInFromTerminal() {
+			fmt.Println("Reading input directly from command line... Press CTRL+D to stop typing")
+		}
+		return viper.ReadConfig(os.Stdin)
+	case "":
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return err
+		}
+		viper.SetConfigName("opslevel.yaml")
 		viper.AddConfigPath(".")
 		viper.AddConfigPath(home)
+	default:
+		viper.SetConfigFile(cfgFile)
 	}
+	return viper.ReadInConfig()
+}
+
+func setupEnv() {
 	viper.SetEnvPrefix("OPSLEVEL")
 	viper.AutomaticEnv()
-	viper.ReadInConfig()
 }
 
 func setupLogging() {

@@ -5,21 +5,21 @@ import (
 	"strings"
 
 	faktory "github.com/contribsys/faktory/client"
-	faktory_worker "github.com/contribsys/faktory_worker_go"
+	faktoryWorker "github.com/contribsys/faktory_worker_go"
 	"github.com/opslevel/opslevel-go/v2024"
 	"github.com/rs/zerolog"
 )
 
 type FaktorySetOutcomeProcessor struct {
 	client                 *faktory.Client
-	helper                 faktory_worker.Helper
+	helper                 faktoryWorker.Helper
 	logger                 zerolog.Logger
 	jobId                  opslevel.ID
 	multilineOutcomeVarKey Stack[string]
 	vars                   map[string]string
 }
 
-func NewFaktorySetOutcomeProcessor(helper faktory_worker.Helper, logger zerolog.Logger, jobId opslevel.ID) *FaktorySetOutcomeProcessor {
+func NewFaktorySetOutcomeProcessor(helper faktoryWorker.Helper, logger zerolog.Logger, jobId opslevel.ID) *FaktorySetOutcomeProcessor {
 	client, _ := faktory.Open()
 	return &FaktorySetOutcomeProcessor{
 		client:                 client,
@@ -74,7 +74,7 @@ func (s *FaktorySetOutcomeProcessor) ProcessStderr(line string) string {
 }
 
 func (s *FaktorySetOutcomeProcessor) Flush(outcome JobOutcome) {
-	vars := []opslevel.RunnerJobOutcomeVariable{}
+	vars := make([]opslevel.RunnerJobOutcomeVariable, 0)
 	for k, v := range s.vars {
 		vars = append(vars, opslevel.RunnerJobOutcomeVariable{
 			Key:   k,
