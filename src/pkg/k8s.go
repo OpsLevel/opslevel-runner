@@ -72,7 +72,7 @@ func NewJobRunner(runnerId string, logger zerolog.Logger, config *rest.Config, c
 }
 
 func (s *JobRunner) getPodEnv(configs []opslevel.RunnerJobVariable) []corev1.EnvVar {
-	output := []corev1.EnvVar{}
+	output := make([]corev1.EnvVar, 0)
 	for _, config := range configs {
 		output = append(output, corev1.EnvVar{
 			Name:  config.Key,
@@ -208,7 +208,7 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 	}
 }
 
-// TODO: Remove all usages of "Viper" they should be passed in at JobRunner configuraiton time
+// TODO: Remove all usages of "Viper" they should be passed in at JobRunner configuration time
 func (s *JobRunner) Run(job opslevel.RunnerJob, stdout, stderr *SafeBuffer) JobOutcome {
 	id := string(job.Id)
 	identifier := fmt.Sprintf("opslevel-job-%s-%d", job.Number(), time.Now().Unix())
@@ -262,8 +262,8 @@ func (s *JobRunner) Run(job opslevel.RunnerJob, stdout, stderr *SafeBuffer) JobO
 		}
 	}
 
-	working_directory := fmt.Sprintf("/jobs/%s/", id)
-	commands := append([]string{fmt.Sprintf("mkdir -p %s", working_directory), fmt.Sprintf("cd %s", working_directory), "set -xv"}, job.Commands...)
+	workingDirectory := fmt.Sprintf("/jobs/%s/", id)
+	commands := append([]string{fmt.Sprintf("mkdir -p %s", workingDirectory), fmt.Sprintf("cd %s", workingDirectory), "set -xv"}, job.Commands...)
 	runErr := s.Exec(stdout, stderr, pod, pod.Spec.Containers[0].Name, viper.GetString("job-pod-shell"), "-e", "-c", strings.Join(commands, ";\n"))
 	if runErr != nil {
 		return JobOutcome{

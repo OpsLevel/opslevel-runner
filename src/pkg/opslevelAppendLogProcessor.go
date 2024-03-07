@@ -87,8 +87,8 @@ func (s *OpsLevelAppendLogProcessor) Flush(outcome JobOutcome) {
 func (s *OpsLevelAppendLogProcessor) submit() {
 	if s.client != nil && len(s.logLines) > 0 {
 		err := s.client.RunnerAppendJobLog(opslevel.RunnerAppendJobLogInput{
-			RunnerId:    opslevel.ID(s.runnerId),
-			RunnerJobId: opslevel.ID(s.jobId),
+			RunnerId:    s.runnerId,
+			RunnerJobId: s.jobId,
 			SentAt:      opslevel.NewISO8601DateNow(),
 			Logs:        s.logLines,
 		})
