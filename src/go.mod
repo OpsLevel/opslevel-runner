@@ -6,7 +6,7 @@ require (
 	github.com/contribsys/faktory v1.8.0
 	github.com/contribsys/faktory_worker_go v1.6.1
 	github.com/getsentry/sentry-go v0.27.0
-	github.com/go-resty/resty/v2 v2.11.0
+	github.com/go-resty/resty/v2 v2.12.0
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/opslevel/opslevel-go/v2024 v2024.2.26
 	github.com/prometheus/client_golang v1.19.0
