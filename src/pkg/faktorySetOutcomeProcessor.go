@@ -82,6 +82,7 @@ func (s *FaktorySetOutcomeProcessor) Flush(outcome JobOutcome) {
 		})
 	}
 	payload := opslevel.RunnerReportJobOutcomeInput{
+		RunnerId:         "faktory",
 		RunnerJobId:      s.jobId,
 		Outcome:          outcome.Outcome,
 		OutcomeVariables: vars,

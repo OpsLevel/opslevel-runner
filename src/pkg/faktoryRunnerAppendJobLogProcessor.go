@@ -88,6 +88,7 @@ func (s *FaktoryAppendJobLogProcessor) Flush(outcome JobOutcome) {
 func (s *FaktoryAppendJobLogProcessor) submit() {
 	if len(s.logLines) > 0 {
 		job := faktory.NewJob("FaktoryRunnerAppendJobLog", opslevel.RunnerAppendJobLogInput{
+			RunnerId:    "faktory",
 			RunnerJobId: s.jobId,
 			SentAt:      opslevel.NewISO8601DateNow(),
 			Logs:        s.logLines,
