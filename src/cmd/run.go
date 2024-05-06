@@ -33,7 +33,7 @@ var runCmd = &cobra.Command{
 }
 
 func init() {
-	runCmd.Flags().String("mode", "api", "Whether to use the 'api` or 'faktory` for jobs.")
+	runCmd.Flags().String("mode", "api", "Whether to use the 'api' or 'faktory' for jobs.")
 	runCmd.Flags().StringArray("queues", []string{"default"}, "The faktory queues to target.")
 	runCmd.Flags().Int("job-concurrency", 3, "The number jobs this runner will handle in parallel.")
 	runCmd.Flags().Int("poll-interval", 10, "The amount of time in seconds between API calls to find pending jobs.")
@@ -257,18 +257,21 @@ func runFaktory() {
 			return err
 		}
 
-		var job opslevel.RunnerJob
 		data, err := json.Marshal(args[0])
 		if err != nil {
+			log.Error().Err(err).Msgf("failed to marshal job data: %v", args[0])
 			return err
 		}
+		var job opslevel.RunnerJob
 		err = json.Unmarshal(data, &job)
 		if err != nil {
+			log.Error().Err(err).Msgf("failed to unmarshal job data: %v", string(data))
 			return err
 		}
 
 		helper := worker.HelperFor(ctx)
 
+		// args[0]["id"] is a factory reserved job id so we need to get the opslevel job id a different way
 		jobID, ok := helper.Custom("opslevel-runner-job-id")
 		if ok {
 			job.Id = opslevel.ID(jobID.(string))
@@ -289,6 +292,8 @@ func runFaktory() {
 				})
 			}
 		}
+
+		// TODO: We should also parse opslevel-runner-extra-files so they can be supplied via custom data
 
 		batch := helper.Bid()
 		if batch != "" {
@@ -337,7 +342,7 @@ func runFaktory() {
 
 		jobDuration := time.Since(jobStart)
 		pkg.MetricJobsDuration.Observe(jobDuration.Seconds())
-		logger.Info().Msgf("Finished job took '%s' and had outcome '%s'", jobDuration, outcome.Outcome)
+		logger.Info().Msgf("Finished job '%s' took '%s' and had outcome '%s'", job.Id, jobDuration, outcome.Outcome)
 		pkg.MetricJobsFinished.WithLabelValues(string(outcome.Outcome)).Inc()
 		pkg.MetricJobsProcessing.Dec()
 		return nil
