@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"os"
 	"strings"
 
@@ -98,12 +99,22 @@ func initConfig() {
 	}
 }
 
+func checkFileExists(filePath string) bool {
+	_, err := os.Stat(filePath)
+	return !errors.Is(err, os.ErrNotExist)
+}
+
 func readConfig() error {
 	if cfgFile != "" {
 		if cfgFile == "." {
 			viper.SetConfigType("yaml")
 			return viper.ReadConfig(os.Stdin)
 		} else {
+			if !checkFileExists(cfgFile) {
+				if _, err := os.Create(cfgFile); err != nil {
+					panic(err)
+				}
+			}
 			viper.SetConfigFile(cfgFile)
 		}
 	} else {
