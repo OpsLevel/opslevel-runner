@@ -2,16 +2,11 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"sync"
 	"time"
-
-	worker "github.com/contribsys/faktory_worker_go"
-	"github.com/mitchellh/mapstructure"
 
 	"github.com/getsentry/sentry-go"
 	"go.opentelemetry.io/otel/attribute"
@@ -120,13 +115,8 @@ func jobWorker(wg *sync.WaitGroup, index int, runnerId opslevel.ID, jobQueue <-c
 	logLevel := strings.ToLower(viper.GetString("log-level"))
 	logger := log.With().Int("worker", index).Logger()
 	client := pkg.NewGraphClient()
-	k8sConfig, err := pkg.GetKubernetesConfig()
-	cobra.CheckErr(err)
-	k8sClient, err := pkg.GetKubernetesClientset()
-	cobra.CheckErr(err)
 	tracer := pkg.GetTracer()
-	podConfig := newJobPodConfig()
-	runner := pkg.NewJobRunner(string(runnerId), logger, k8sConfig, k8sClient, podConfig)
+	runner := pkg.NewJobRunner(string(runnerId))
 
 	logger.Info().Msgf("Starting job processor %d ...", index)
 	defer wg.Done()
@@ -229,130 +219,4 @@ func jobPoller(runnerId opslevel.ID, stop <-chan struct{}, jobQueue chan<- opsle
 			time.Sleep(pollWaitTime)
 		}
 	}
-}
-
-type MapStructureRunnerJobVariable struct {
-	Key       string `mapstructure:"key"`
-	Value     string `mapstructure:"value"`
-	Sensitive bool   `mapstructure:"sensitive"`
-}
-
-func runFaktory() {
-	logMaxBytes := viper.GetInt("job-pod-log-max-size")
-	logMaxDuration := time.Duration(viper.GetInt("job-pod-log-max-interval")) * time.Second
-	logPrefix := func() string { return fmt.Sprintf("%s [%d] ", time.Now().UTC().Format(time.RFC3339), 0) }
-	logger := log.With().Int("faktory", 0).Logger()
-	podConfig := newJobPodConfig()
-
-	mgr := worker.NewManager()
-	mgr.Register("legacy", func(ctx context.Context, args ...interface{}) error {
-		pkg.MetricJobsStarted.Inc()
-
-		config, err := pkg.GetKubernetesConfig()
-		if err != nil {
-			return err
-		}
-		localClientset, err := pkg.GetKubernetesClientset()
-		if err != nil {
-			return err
-		}
-
-		data, err := json.Marshal(args[0])
-		if err != nil {
-			log.Error().Err(err).Msgf("failed to marshal job data: %v", args[0])
-			return err
-		}
-		var job opslevel.RunnerJob
-		err = json.Unmarshal(data, &job)
-		if err != nil {
-			log.Error().Err(err).Msgf("failed to unmarshal job data: %v", string(data))
-			return err
-		}
-
-		helper := worker.HelperFor(ctx)
-
-		// args[0]["id"] is a factory reserved job id so we need to get the opslevel job id a different way
-		jobID, ok := helper.Custom("opslevel-runner-job-id")
-		if ok {
-			job.Id = opslevel.ID(jobID.(string))
-		}
-
-		extraVars, ok := helper.Custom("opslevel-runner-extra-vars")
-		if ok {
-			var castedVars []MapStructureRunnerJobVariable
-			err := mapstructure.Decode(extraVars, &castedVars)
-			if err != nil {
-				return err
-			}
-			for _, extraVar := range castedVars {
-				job.Variables = append(job.Variables, opslevel.RunnerJobVariable{
-					Key:       extraVar.Key,
-					Value:     extraVar.Value,
-					Sensitive: extraVar.Sensitive,
-				})
-			}
-		}
-
-		// TODO: We should also parse opslevel-runner-extra-files so they can be supplied via custom data
-
-		batch := helper.Bid()
-		if batch != "" {
-			job.Variables = append(job.Variables, opslevel.RunnerJobVariable{
-				Key:       "FAKTORY_BATCH_ID",
-				Value:     batch,
-				Sensitive: false,
-			})
-		}
-		faktoryProvider, faktoryProviderPresent := os.LookupEnv("FAKTORY_PROVIDER")
-		if faktoryProviderPresent {
-			job.Variables = append(job.Variables, opslevel.RunnerJobVariable{
-				Key:       "FAKTORY_PROVIDER",
-				Value:     faktoryProvider,
-				Sensitive: false,
-			})
-		}
-		faktoryUrl, faktoryUrlPresent := os.LookupEnv("FAKTORY_URL")
-		if faktoryUrlPresent {
-			job.Variables = append(job.Variables, opslevel.RunnerJobVariable{
-				Key:       "FAKTORY_URL",
-				Value:     faktoryUrl,
-				Sensitive: false,
-			})
-		}
-		job.Variables = append(job.Variables, opslevel.RunnerJobVariable{
-			Key:       "RUNNER_JOB_ID",
-			Value:     string(job.Id),
-			Sensitive: false,
-		})
-
-		streamer := pkg.NewLogStreamer(
-			logger,
-			pkg.NewFaktorySetOutcomeProcessor(helper, logger, job.Id),
-			pkg.NewSanitizeLogProcessor(job.Variables),
-			pkg.NewPrefixLogProcessor(logPrefix),
-			pkg.NewFaktoryAppendJobLogProcessor(helper, logger, job.Id, logMaxBytes, logMaxDuration),
-		)
-		pkg.MetricJobsProcessing.Inc()
-		jobStart := time.Now()
-		go streamer.Run()
-
-		runner := pkg.NewJobRunner("faktory", logger, config, localClientset, podConfig)
-		outcome := runner.Run(job, streamer.Stdout, streamer.Stderr)
-		streamer.Flush(outcome)
-
-		jobDuration := time.Since(jobStart)
-		pkg.MetricJobsDuration.Observe(jobDuration.Seconds())
-		logger.Info().Msgf("Finished job '%s' took '%s' and had outcome '%s'", job.Id, jobDuration, outcome.Outcome)
-		pkg.MetricJobsFinished.WithLabelValues(string(outcome.Outcome)).Inc()
-		pkg.MetricJobsProcessing.Dec()
-		return nil
-	})
-	mgr.Concurrency = getConcurrency()
-	mgr.ProcessStrictPriorityQueues(viper.GetStringSlice("queues")...)
-	logger.Info().Msgf("Starting faktory worker")
-	err := mgr.Run() // blocking
-	if err != nil {
-		logger.Error().Err(err).Msgf("faktory worker returned error")
-	}
-	logger.Info().Msgf("Stopping faktory worker")
 }

@@ -79,17 +79,6 @@ func init() {
 	cobra.OnInitialize(initConfig)
 }
 
-func newJobPodConfig() pkg.JobPodConfig {
-	return pkg.JobPodConfig{
-		Namespace:   viper.GetString("job-pod-namespace"),
-		Lifetime:    viper.GetInt("job-pod-max-lifetime"),
-		CpuRequests: viper.GetInt64("job-pod-requests-cpu"),
-		MemRequests: viper.GetInt64("job-pod-requests-memory"),
-		CpuLimit:    viper.GetInt64("job-pod-limits-cpu"),
-		MemLimit:    viper.GetInt64("job-pod-limits-memory"),
-	}
-}
-
 func initConfig() {
 	err := readConfig()
 	cobra.CheckErr(err)
@@ -97,6 +86,7 @@ func initConfig() {
 	if value, present := os.LookupEnv("SENTRY_DSN"); present {
 		setupSentry(value)
 	}
+	pkg.LoadK8SClient()
 }
 
 func checkFileExists(filePath string) bool {
