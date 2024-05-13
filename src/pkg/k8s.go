@@ -3,6 +3,8 @@ package pkg
 import (
 	"context"
 	"fmt"
+	"github.com/rs/zerolog/log"
+	"github.com/spf13/cobra"
 	"io"
 	"strings"
 	"time"
@@ -26,7 +28,10 @@ import (
 	"github.com/spf13/viper"
 )
 
-var ImageTagVersion string
+var (
+	ImageTagVersion string
+	k8sValidated    bool
+)
 
 type JobConfig struct {
 	Command       []string
@@ -61,13 +66,43 @@ type JobPodConfig struct {
 	MemLimit    int64 // in MB
 }
 
-func NewJobRunner(runnerId string, logger zerolog.Logger, config *rest.Config, clientset *kubernetes.Clientset, jobPodConfig JobPodConfig) *JobRunner {
+func LoadK8SClient() {
+	// This function is used to ensure we can connect to k8s
+	// We don't cache the config or clients for goroutine parallel problems
+	if _, err := GetKubernetesConfig(); err != nil {
+		cobra.CheckErr(err)
+	}
+	if _, err := GetKubernetesClientset(); err != nil {
+		cobra.CheckErr(err)
+	}
+	k8sValidated = true
+}
+
+func newJobPodConfig() JobPodConfig {
+	return JobPodConfig{
+		Namespace:   viper.GetString("job-pod-namespace"),
+		Lifetime:    viper.GetInt("job-pod-max-lifetime"),
+		CpuRequests: viper.GetInt64("job-pod-requests-cpu"),
+		MemRequests: viper.GetInt64("job-pod-requests-memory"),
+		CpuLimit:    viper.GetInt64("job-pod-limits-cpu"),
+		MemLimit:    viper.GetInt64("job-pod-limits-memory"),
+	}
+}
+
+func NewJobRunner(runnerId string) *JobRunner {
+	if !k8sValidated {
+		// It's ok if this function panics because we wouldn't beable to run jobs anyway
+		LoadK8SClient()
+	}
+	// We recreate the config & clients here to ensure goroutine parallel problems don't raise their head
+	config, _ := GetKubernetesConfig()
+	client, _ := GetKubernetesClientset()
 	return &JobRunner{
 		runnerId:     runnerId,
-		logger:       logger,
+		logger:       log.With().Str("runner", runnerId).Logger(),
 		config:       config,
-		clientset:    clientset,
-		jobPodConfig: jobPodConfig,
+		clientset:    client,
+		jobPodConfig: newJobPodConfig(),
 	}
 }
 
