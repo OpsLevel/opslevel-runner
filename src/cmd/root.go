@@ -111,7 +111,9 @@ func readConfig() error {
 			return viper.ReadConfig(os.Stdin)
 		} else {
 			if !checkFileExists(cfgFile) {
-				os.Create(cfgFile)
+				if _, err := os.Create(cfgFile); err != nil {
+					panic(err)
+				}
 			}
 			viper.SetConfigFile(cfgFile)
 		}
