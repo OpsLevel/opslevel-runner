@@ -248,7 +248,13 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 // TODO: Remove all usages of "Viper" they should be passed in at JobRunner configuration time
 func (s *JobRunner) Run(job opslevel.RunnerJob, stdout, stderr *SafeBuffer) JobOutcome {
 	id := string(job.Id)
-	identifier := fmt.Sprintf("opslevel-job-%s-%d", job.Number(), time.Now().Unix())
+	var identifier string
+	switch viper.GetString("mode") {
+	case "faktory":
+		identifier = fmt.Sprintf("opslevel-job-%s-%d", job.Id, time.Now().Unix())
+	case "api":
+		identifier = fmt.Sprintf("opslevel-job-%s-%d", job.Number(), time.Now().Unix())
+	}
 	runnerIdentifier := fmt.Sprintf("runner-%s", s.runnerId)
 	labels := map[string]string{
 		"app.kubernetes.io/instance":   identifier,
