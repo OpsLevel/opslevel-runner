@@ -4,14 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"time"
+
 	worker "github.com/contribsys/faktory_worker_go"
 	"github.com/mitchellh/mapstructure"
 	"github.com/opslevel/opslevel-go/v2024"
 	"github.com/opslevel/opslevel-runner/pkg"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
-	"os"
-	"time"
 )
 
 type MapStructureRunnerJobVariable struct {

@@ -3,11 +3,12 @@ package pkg
 import (
 	"context"
 	"fmt"
-	"github.com/rs/zerolog/log"
-	"github.com/spf13/cobra"
 	"io"
 	"strings"
 	"time"
+
+	"github.com/rs/zerolog/log"
+	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/util/intstr"
 
