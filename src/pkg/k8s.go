@@ -169,9 +169,8 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 			RestartPolicy:                 corev1.RestartPolicyNever,
 			InitContainers: []corev1.Container{
 				{
-					Name: "helper",
-					//Image:           fmt.Sprintf("public.ecr.aws/opslevel/opslevel-runner:v%s", ImageTagVersion),
-					Image:           "public.ecr.aws/opslevel/opslevel-runner:v2024.1.3",
+					Name:            "helper",
+					Image:           "public.ecr.aws/opslevel/opslevel-runner:v2024.1.3", // TODO: fmt.Sprintf("public.ecr.aws/opslevel/opslevel-runner:v%s", ImageTagVersion),
 					ImagePullPolicy: corev1.PullIfNotPresent,
 					Command: []string{
 						"cp",
