@@ -93,41 +93,58 @@ tasks:
           exit 1
         fi
 
+  start-faktory:
+    desc: Start Faktory and opslevel-runner in faktory mode
+    dir: "{{.SRC_DIR}}"
+    deps:
+      - install-goreman
+      - install-faktory
+    cmds:
+      - goreman start
 
   # internal (not directly called) tasks
-
-  go-install-tool:
-    desc: go install '{{.GO_TOOL}}' and set GOBIN if not set
-    internal: true
-    silent: true
-    vars:
-      IS_TOOL_INSTALLED:
-        sh: which {{.GO_TOOL}} > /dev/null || echo "1"
-    cmds:
-      - test -z "{{.IS_TOOL_INSTALLED}}" || echo "Installing {{.GO_TOOL}}..."
-      - test -z "{{.IS_TOOL_INSTALLED}}" || go install {{.GO_TOOL_PATH}}
-      - test -n $(go env GOBIN) || go env -w GOBIN=$(go env GOPATH)/bin
-      - echo "  '{{.GO_TOOL}}' is installed."
-    requires:
-      vars: [GO_TOOL, GO_TOOL_PATH]
 
   install-changie:
     desc: go install "changie"
     internal: true
+    status:
+      - test -n "command -v changie"
     cmds:
-      - task: go-install-tool
-        vars: { GO_TOOL: "changie", GO_TOOL_PATH: "github.com/miniscruff/changie@latest" }
+      - go install "github.com/miniscruff/changie@latest"
+
+  install-goreman:
+    desc: go install "goreman"
+    internal: true
+    status:
+      - test -n "command -v goreman"
+    cmds:
+      - go install "github.com/mattn/goreman@latest"
+
+  install-faktory:
+    desc: install "faktory"
+    internal: true
+    status:
+      - test -n "command -v faktory"
+    cmds:
+      - mkdir -p ./faktory
+      - curl -sL https://github.com/contribsys/faktory/releases/download/v1.8.0/faktory-ent_1.8.0.macos.$(go env GOARCH).tbz -o ./faktory/faktory-ent.osx.tbz
+      - tar xjf ./faktory/faktory-ent.osx.tbz -C ./faktory
+      - mv ./faktory/faktory /usr/local/bin
+      - chmod +x /usr/local/bin/faktory
+      - rm -rf ./faktory
 
   install-gofumpt:
     desc: go install "gofumpt"
     internal: true
+    status:
+      - test -n "command -v gofumpt"
     cmds:
-      - task: go-install-tool
-        vars: { GO_TOOL: "gofumpt", GO_TOOL_PATH: "mvdan.cc/gofumpt@latest" }
+      - go install "mvdan.cc/gofumpt@latest"
 
   install-golangci-lint:
     desc: go install "golangci-lint"
     internal: true
+    status:
+      - test -n "command -v golangci-lint"
     cmds:
-      - task: go-install-tool
-        vars: { GO_TOOL: "golangci-lint", GO_TOOL_PATH: "github.com/golangci/golangci-lint/cmd/golangci-lint@latest" }
+      - go install "github.com/golangci/golangci-lint/cmd/golangci-lint@latest"
