@@ -35,12 +35,12 @@ brews:
     homepage: "https://www.opslevel.com/"
     description: "Command line tool that runs jobs for OpsLevel"
     license: "MIT"
-    folder: Formula
+    directory: Formula
     install: |
       bin.install "opslevel-runner"
     test: |
       system "#{bin}/opslevel-runner version"
-    tap:
+    repository:
       owner: opslevel
       name: homebrew-tap
       token: "{{ .Env.ORG_GITHUB_TOKEN }}"
