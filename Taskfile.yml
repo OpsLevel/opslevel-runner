@@ -104,25 +104,57 @@ tasks:
 
   # internal (not directly called) tasks
 
+  go-install-tool:
+    desc: go install '{{.GO_TOOL}}' and set GOBIN if not set
+    internal: true
+    status:
+      - test -n "command -v {{.GO_TOOL}}"
+    cmds:
+      - go install {{.GO_TOOL_PATH}}
+    requires:
+      vars: [GO_TOOL, GO_TOOL_PATH]
+
   install-changie:
     desc: go install "changie"
     internal: true
-    status:
-      - test -n "command -v changie"
     cmds:
-      - go install "github.com/miniscruff/changie@latest"
+      - task: go-install-tool
+        vars: { GO_TOOL: "changie", GO_TOOL_PATH: "github.com/miniscruff/changie@latest" }
+
+  install-gofumpt:
+    desc: go install "gofumpt"
+    internal: true
+    cmds:
+      - task: go-install-tool
+        vars: { GO_TOOL: "gofumpt", GO_TOOL_PATH: "mvdan.cc/gofumpt@latest" }
+
+  install-golangci-lint:
+    desc: go install "golangci-lint"
+    internal: true
+    cmds:
+      - task: go-install-tool
+        vars: { GO_TOOL: "golangci-lint", GO_TOOL_PATH: "github.com/golangci/golangci-lint/cmd/golangci-lint@latest" }
 
   install-goreman:
     desc: go install "goreman"
     internal: true
-    status:
-      - test -n "command -v goreman"
     cmds:
-      - go install "github.com/mattn/goreman@latest"
+      - task: go-install-tool
+        vars: { GO_TOOL: "goreman", GO_TOOL_PATH: "github.com/mattn/goreman@latest" }
+
+  install-redis:
+    desc: install "redis-server"
+    internal: true
+    status:
+      - test -n "command -v redis-server"
+    cmds:
+      - brew install redis
 
   install-faktory:
     desc: install "faktory"
     internal: true
+    deps:
+      - install-redis
     status:
       - test -n "command -v faktory"
     cmds:
@@ -132,19 +164,3 @@ tasks:
       - mv ./faktory/faktory /usr/local/bin
       - chmod +x /usr/local/bin/faktory
       - rm -rf ./faktory
-
-  install-gofumpt:
-    desc: go install "gofumpt"
-    internal: true
-    status:
-      - test -n "command -v gofumpt"
-    cmds:
-      - go install "mvdan.cc/gofumpt@latest"
-
-  install-golangci-lint:
-    desc: go install "golangci-lint"
-    internal: true
-    status:
-      - test -n "command -v golangci-lint"
-    cmds:
-      - go install "github.com/golangci/golangci-lint/cmd/golangci-lint@latest"
