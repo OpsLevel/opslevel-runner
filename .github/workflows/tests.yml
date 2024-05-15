@@ -27,6 +27,11 @@ jobs:
           version: 3.x
           repo-token: ${{ secrets.ORG_GITHUB_TOKEN }}
       - name: Run quality checks and test code
+        env:
+          # GOPATH is no longer exported by the actions/setup-go@v2
+          # https://github.com/actions/setup-go/issues/12#issuecomment-604605595
+          # https://github.com/goreleaser/goreleaser-action/issues/267
+          GOPATH: /home/runner/go
         run: task ci
       - name: Upload Coverage
         uses: codecov/codecov-action@v4
