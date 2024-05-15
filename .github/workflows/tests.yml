@@ -21,6 +21,13 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: 'src/go.mod'
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
       - name: Install Task
         uses: arduino/setup-task@v2
         with:
@@ -32,7 +39,12 @@ jobs:
           # https://github.com/actions/setup-go/issues/12#issuecomment-604605595
           # https://github.com/goreleaser/goreleaser-action/issues/267
           GOPATH: /home/runner/go
-        run: task ci
+        run: |
+          echo $GOPATH
+          echo $GOBIN
+          echo $(go env GOPATH)
+          echo $(go env GOBIN)
+          task ci
       - name: Upload Coverage
         uses: codecov/codecov-action@v4
         with:
