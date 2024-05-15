@@ -34,7 +34,15 @@ func prepareJob(helper worker.Helper, job opslevel.RunnerJob) error {
 	// args[0]["id"] is a factory reserved job id so we need to get the opslevel job id a different way
 	jobID, ok := helper.Custom("opslevel-runner-job-id")
 	if ok {
-		job.Id = opslevel.ID(jobID.(string))
+		switch casted := jobID.(type) {
+		case string:
+			job.Id = opslevel.ID(casted)
+		case float64:
+			job.Id = opslevel.ID(fmt.Sprintf("%f", casted))
+		default:
+			job.Id = "0"
+			log.Warn().Msgf("opslevel-runner-job-id is unexpected type '%T' value was '%v'", jobID, jobID)
+		}
 	}
 
 	extraVars, ok := helper.Custom("opslevel-runner-extra-vars")
@@ -129,7 +137,7 @@ func emitJobStartedMetrics() time.Time {
 
 func emitJobCompleteMetrics(jobStart time.Time, job opslevel.RunnerJob, outcome pkg.JobOutcome) {
 	jobDuration := time.Since(jobStart)
-	log.Info().Msgf("Finished job '%s' took '%s' and had outcome '%s'", job.Id, jobDuration, outcome.Outcome)
+	log.Info().Str("outcome", outcome.Message).Msgf("Finished job '%s' took '%s' and had outcome '%s'", job.Id, jobDuration, outcome.Outcome)
 	pkg.MetricJobsDuration.Observe(jobDuration.Seconds())
 	pkg.MetricJobsFinished.WithLabelValues(string(outcome.Outcome)).Inc()
 	pkg.MetricJobsProcessing.Dec()

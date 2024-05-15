@@ -170,7 +170,7 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 			InitContainers: []corev1.Container{
 				{
 					Name:            "helper",
-					Image:           fmt.Sprintf("public.ecr.aws/opslevel/opslevel-runner:v%s", ImageTagVersion),
+					Image:           "public.ecr.aws/opslevel/opslevel-runner:v2024.1.3", // TODO: fmt.Sprintf("public.ecr.aws/opslevel/opslevel-runner:v%s", ImageTagVersion),
 					ImagePullPolicy: corev1.PullIfNotPresent,
 					Command: []string{
 						"cp",
@@ -247,7 +247,15 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 // TODO: Remove all usages of "Viper" they should be passed in at JobRunner configuration time
 func (s *JobRunner) Run(job opslevel.RunnerJob, stdout, stderr *SafeBuffer) JobOutcome {
 	id := string(job.Id)
-	identifier := fmt.Sprintf("opslevel-job-%s-%d", job.Number(), time.Now().Unix())
+	// Once we get off "the old API" method of runner we can circle back around to thi
+	// and fix it to generate safe pod names.
+	var identifier string
+	switch viper.GetString("mode") {
+	case "faktory":
+		identifier = fmt.Sprintf("opslevel-job-%s-%d", job.Id, time.Now().Unix())
+	case "api":
+		identifier = fmt.Sprintf("opslevel-job-%s-%d", job.Number(), time.Now().Unix())
+	}
 	runnerIdentifier := fmt.Sprintf("runner-%s", s.runnerId)
 	labels := map[string]string{
 		"app.kubernetes.io/instance":   identifier,

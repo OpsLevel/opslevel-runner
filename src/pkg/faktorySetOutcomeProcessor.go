@@ -87,7 +87,7 @@ func (s *FaktorySetOutcomeProcessor) Flush(outcome JobOutcome) {
 		Outcome:          outcome.Outcome,
 		OutcomeVariables: vars,
 	}
-	job := faktory.NewJob("FaktoryRunnerReportJobOutcome", payload)
+	job := faktory.NewJob("Runners::Faktory::ReportJobOutcome", payload)
 	job.Queue = "app"
 	batch := s.helper.Bid()
 	if batch != "" {
