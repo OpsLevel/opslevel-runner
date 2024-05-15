@@ -34,12 +34,7 @@ jobs:
           version: 3.x
           repo-token: ${{ secrets.ORG_GITHUB_TOKEN }}
       - name: Run quality checks and test code
-        run: |
-          export GOPATH=$HOME/go
-          export GOBIN=$(go env GOPATH)/bin
-          export PATH=$PATH:$GOPATH
-          export PATH=$PATH:$GOBIN
-          task ci
+        run: task ci
       - name: Upload Coverage
         uses: codecov/codecov-action@v4
         with:
