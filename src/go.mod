@@ -9,7 +9,7 @@ require (
 	github.com/go-resty/resty/v2 v2.13.1
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/opslevel/opslevel-go/v2024 v2024.5.13
-	github.com/prometheus/client_golang v1.19.0
+	github.com/prometheus/client_golang v1.19.1
 	github.com/rocktavious/autopilot/v2023 v2023.12.7
 	github.com/rs/zerolog v1.32.0
 	github.com/spf13/cobra v1.8.0
