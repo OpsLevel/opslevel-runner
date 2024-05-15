@@ -1,3 +1,0 @@
-kind: Bugfix
-body: Runner will now log errors when configmap, PDB, pod deletion op returns an error
-time: 2024-03-07T13:14:57.290516-05:00
