@@ -30,7 +30,7 @@ func startFaktory(mgr *worker.Manager) {
 	log.Info().Msgf("Stopping faktory worker")
 }
 
-func prepareJob(helper worker.Helper, job opslevel.RunnerJob) error {
+func prepareJob(helper worker.Helper, job opslevel.RunnerJob) (opslevel.RunnerJob, error) {
 	// args[0]["id"] is a factory reserved job id so we need to get the opslevel job id a different way
 	jobID, ok := helper.Custom("opslevel-runner-job-id")
 	if ok {
@@ -38,7 +38,7 @@ func prepareJob(helper worker.Helper, job opslevel.RunnerJob) error {
 		case string:
 			job.Id = opslevel.ID(casted)
 		case float64:
-			job.Id = opslevel.ID(fmt.Sprintf("%f", casted))
+			job.Id = opslevel.ID(fmt.Sprintf("%d", int(casted)))
 		default:
 			job.Id = "0"
 			log.Warn().Msgf("opslevel-runner-job-id is unexpected type '%T' value was '%v'", jobID, jobID)
@@ -50,7 +50,7 @@ func prepareJob(helper worker.Helper, job opslevel.RunnerJob) error {
 		var castedVars []MapStructureRunnerJobVariable
 		err := mapstructure.Decode(extraVars, &castedVars)
 		if err != nil {
-			return err
+			return job, err
 		}
 		for _, extraVar := range castedVars {
 			job.Variables = append(job.Variables, opslevel.RunnerJobVariable{
@@ -92,7 +92,7 @@ func prepareJob(helper worker.Helper, job opslevel.RunnerJob) error {
 		Value:     string(job.Id),
 		Sensitive: false,
 	})
-	return nil
+	return job, nil
 }
 
 func parseJob(args []any) (opslevel.RunnerJob, error) {
@@ -124,6 +124,7 @@ func runJob(helper worker.Helper, job opslevel.RunnerJob) pkg.JobOutcome {
 	go streamer.Run()
 
 	pkg.MetricJobsProcessing.Inc()
+	logger.Info().Msgf("Starting job '%s'", job.Id)
 	runner := pkg.NewJobRunner("faktory")
 	outcome := runner.Run(job, streamer.Stdout, streamer.Stderr)
 	streamer.Flush(outcome)
@@ -153,7 +154,8 @@ func legacyJobHandler(ctx context.Context, args ...interface{}) error {
 
 	helper := worker.HelperFor(ctx)
 
-	if err := prepareJob(helper, job); err != nil {
+	job, err = prepareJob(helper, job)
+	if err != nil {
 		return err
 	}
 
