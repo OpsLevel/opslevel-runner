@@ -247,8 +247,8 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 // TODO: Remove all usages of "Viper" they should be passed in at JobRunner configuration time
 func (s *JobRunner) Run(job opslevel.RunnerJob, stdout, stderr *SafeBuffer) JobOutcome {
 	id := string(job.Id)
-	// Once we get off "the old API" method of runner we can circle back around to thi
-	// and fix it to generate safe pod names.
+	// Once we get off "the old API" method of runner we can circle back around to this
+	// and fix it to generate safe pod names since k8s has limitations.
 	var identifier string
 	switch viper.GetString("mode") {
 	case "faktory":
