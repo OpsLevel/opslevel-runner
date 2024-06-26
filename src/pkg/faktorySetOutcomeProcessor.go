@@ -95,12 +95,14 @@ func (s *FaktorySetOutcomeProcessor) Flush(outcome JobOutcome) {
 			return b.Push(job)
 		})
 		if err != nil {
-			s.logger.Error().Err(err).Msgf("error when reporting outcome '%s' for job", outcome.Outcome)
+			MetricEnqueueBatchFailed.Inc()
+			s.logger.Error().Err(err).Msgf("error when reporting outcome '%s' for job '%s'", outcome.Outcome, s.jobId)
 		}
 	} else {
 		err := s.client.Push(job)
 		if err != nil {
-			s.logger.Error().Err(err).Msgf("error when reporting outcome '%s' for job", outcome.Outcome)
+			MetricEnqueueFailed.Inc()
+			s.logger.Error().Err(err).Msgf("error when reporting outcome '%s' for job '%s'", outcome.Outcome, s.jobId)
 		}
 	}
 }
