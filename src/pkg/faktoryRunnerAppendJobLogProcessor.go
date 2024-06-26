@@ -101,7 +101,7 @@ func (s *FaktoryAppendJobLogProcessor) submit() {
 			})
 			if err != nil {
 				MetricEnqueueBatchFailed.Inc()
-				s.logger.Error().Err(err).Msgf("error while enqueuing append logs for '%d' log line(s) for job '%d'", len(s.logLines), s.jobId)
+				s.logger.Error().Err(err).Msgf("error while enqueuing append logs for '%d' log line(s) for job '%s'", len(s.logLines), s.jobId)
 			}
 		} else {
 			err := s.client.Push(job)
