@@ -4,7 +4,7 @@ go 1.22
 
 require (
 	github.com/contribsys/faktory v1.9.0
-	github.com/contribsys/faktory_worker_go v1.6.1
+	github.com/contribsys/faktory_worker_go v1.7.0
 	github.com/getsentry/sentry-go v0.27.0
 	github.com/go-resty/resty/v2 v2.14.0
 	github.com/mitchellh/mapstructure v1.5.0
