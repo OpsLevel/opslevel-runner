@@ -13,11 +13,11 @@ github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkY
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
-github.com/cespare/xxhash/v2 v2.2.0 h1:DC2CZ1Ep5Y4k3ZQ899DldepgrayRUGE6BBZ/cd9Cj44=
-github.com/cespare/xxhash/v2 v2.2.0/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
+github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=
+github.com/cespare/xxhash/v2 v2.3.0/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
-github.com/contribsys/faktory v1.8.0 h1:Rkxdph/1Tv9g60J8pyO2F7jKao77sRECh7HDBhgtuvI=
-github.com/contribsys/faktory v1.8.0/go.mod h1:SP+Y2Pr+JqLY9YJL3YNlJhdzTinm/oUe2CcOpwDHQR0=
+github.com/contribsys/faktory v1.9.0 h1:oC6SM3l3+TDtuBcWVbQMzAzucljEnqOBV3iuQ4pdRAY=
+github.com/contribsys/faktory v1.9.0/go.mod h1:oiOAlP8Wxc/HyMWbZJpXlt+HK9QWhr8C3NIDLS2BoRo=
 github.com/contribsys/faktory_worker_go v1.6.1 h1:ErFrulG2gcCtj6ew5H8MposJfjQ++OBvA51HY6yCiRY=
 github.com/contribsys/faktory_worker_go v1.6.1/go.mod h1:BjJ6VZLnp8ji/bA3mFABNy+BI2pEgTEGb7mXPdyui+E=
 github.com/coreos/go-systemd/v22 v22.5.0/go.mod h1:Y58oyj3AT4RCenI/lSvhwexgC+NSVTIJ3seZv2GcEnc=
