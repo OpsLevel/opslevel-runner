@@ -1,0 +1,3 @@
+kind: Dependency
+body: bump github.com/contribsys/faktory to v1.9.0, github.com/contribsys/faktory_worker_go to v1.7.0, github.com/spf13/viper to v1.19.0, go.opentelemetry.io/otel to v1.29.0, go.opentelemetry.io/otel/trace to v1.29.0
+time: 2024-09-03T11:35:33.013479-05:00
