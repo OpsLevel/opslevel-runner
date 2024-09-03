@@ -50,7 +50,7 @@ func doTest(cmd *cobra.Command, args []string) error {
 	streamer.Flush(outcome)
 
 	if outcome.Outcome != opslevel.RunnerJobOutcomeEnumSuccess {
-		return fmt.Errorf(outcome.Message)
+		return fmt.Errorf("%s", outcome.Message)
 	}
 	return nil
 }
