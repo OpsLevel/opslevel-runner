@@ -1,4 +1,0 @@
-kind: "Dependency"
-body: "Bump github.com/prometheus/client_golang from 1.19.1 to 1.20.3 in /src"
-time: 2024-09-17T13:56:09.00000Z
-
