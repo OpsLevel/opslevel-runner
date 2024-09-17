@@ -1,6 +1,6 @@
 module github.com/opslevel/opslevel-runner
 
-go 1.22
+go 1.23
 
 require (
 	github.com/contribsys/faktory v1.9.1
