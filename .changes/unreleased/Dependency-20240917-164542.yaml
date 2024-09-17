@@ -1,0 +1,4 @@
+kind: "Dependency"
+body: "Bump github.com/go-resty/resty/v2 from 2.14.0 to 2.15.0 in /src"
+time: 2024-09-17T16:45:42.00000Z
+
