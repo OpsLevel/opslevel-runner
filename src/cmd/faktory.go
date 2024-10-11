@@ -71,6 +71,8 @@ func prepareJob(helper worker.Helper, job opslevel.RunnerJob) (opslevel.RunnerJo
 		switch v := image.(type) {
 		case string:
 			job.Image = v
+		default:
+			log.Warn().Msgf("opslevel-runner-image is unexpected type '%T' value was '%v'", image)
 		}
 	}
 
@@ -79,6 +81,8 @@ func prepareJob(helper worker.Helper, job opslevel.RunnerJob) (opslevel.RunnerJo
 		switch v := commands.(type) {
 		case []string:
 			job.Commands = v
+		default:
+			log.Warn().Msgf("opslevel-runner-commands is unexpected type '%T' value was '%v'", commands)
 		}
 	}
 
