@@ -76,14 +76,14 @@ func prepareJob(helper worker.Helper, job opslevel.RunnerJob) (opslevel.RunnerJo
 		}
 	}
 
-	commands, ok := helper.Custom("opslevel-runner-commands")
+	extraCommands, ok := helper.Custom("opslevel-runner-commands")
 	if ok {
-		switch v := commands.(type) {
-		case []string:
-			job.Commands = v
-		default:
-			log.Warn().Msgf("opslevel-runner-commands is unexpected type '%T' value was '%v'", commands, commands)
+		var commands []string
+		err := mapstructure.Decode(extraCommands, &commands)
+		if err != nil {
+			return job, err
 		}
+		job.Commands = append(job.Commands, commands...)
 	}
 
 	extraFiles, ok := helper.Custom("opslevel-runner-files")
