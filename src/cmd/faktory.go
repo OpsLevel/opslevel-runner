@@ -157,35 +157,7 @@ func extractCustomExtraFiles(helper worker.Helper, job *opslevel.RunnerJob) erro
 	return nil
 }
 
-func prepareJob(helper worker.Helper, args ...interface{}) (*opslevel.RunnerJob, error) {
-	var job *opslevel.RunnerJob
-
-	if err := parseJob(args, job); err != nil {
-		return nil, err
-	}
-
-	extractJobId(helper, job)
-
-	if err := extractCustomImage(helper, job); err != nil {
-		return nil, err
-	}
-
-	if err := extractCustomExtraCommands(helper, job); err != nil {
-		return nil, err
-	}
-
-	if err := extractCustomExtraVars(helper, job); err != nil {
-		return nil, err
-	}
-
-	if err := extractCustomExtraFiles(helper, job); err != nil {
-		return nil, err
-	}
-
-	return job, nil
-}
-
-func runJob(helper worker.Helper, job *opslevel.RunnerJob) pkg.JobOutcome {
+func runJob(helper worker.Helper, job opslevel.RunnerJob) pkg.JobOutcome {
 	logger := log.With().Str("runner", "faktory").Logger()
 	logMaxBytes := viper.GetInt("job-pod-log-max-size")
 	logMaxDuration := time.Duration(viper.GetInt("job-pod-log-max-interval")) * time.Second
@@ -202,7 +174,7 @@ func runJob(helper worker.Helper, job *opslevel.RunnerJob) pkg.JobOutcome {
 	pkg.MetricJobsProcessing.Inc()
 	logger.Info().Msgf("Starting job '%s'", job.Id)
 	runner := pkg.NewJobRunner("faktory")
-	outcome := runner.Run(*job, streamer.Stdout, streamer.Stderr)
+	outcome := runner.Run(job, streamer.Stdout, streamer.Stderr)
 	streamer.Flush(outcome)
 	return outcome
 }
@@ -212,7 +184,7 @@ func emitJobStartedMetrics() time.Time {
 	return time.Now()
 }
 
-func emitJobCompleteMetrics(jobStart time.Time, job *opslevel.RunnerJob, outcome pkg.JobOutcome) {
+func emitJobCompleteMetrics(jobStart time.Time, job opslevel.RunnerJob, outcome pkg.JobOutcome) {
 	jobDuration := time.Since(jobStart)
 	log.Info().Str("outcome", outcome.Message).Msgf("Finished job '%s' took '%s' and had outcome '%s'", job.Id, jobDuration, outcome.Outcome)
 	pkg.MetricJobsDuration.Observe(jobDuration.Seconds())
@@ -225,8 +197,27 @@ func legacyJobHandler(ctx context.Context, args ...interface{}) error {
 
 	helper := worker.HelperFor(ctx)
 
-	job, err := prepareJob(helper, args)
-	if err != nil {
+	var job opslevel.RunnerJob
+
+	if err := parseJob(args, &job); err != nil {
+		return err
+	}
+
+	extractJobId(helper, &job)
+
+	if err := extractCustomImage(helper, &job); err != nil {
+		return err
+	}
+
+	if err := extractCustomExtraCommands(helper, &job); err != nil {
+		return err
+	}
+
+	if err := extractCustomExtraVars(helper, &job); err != nil {
+		return err
+	}
+
+	if err := extractCustomExtraFiles(helper, &job); err != nil {
 		return err
 	}
 
