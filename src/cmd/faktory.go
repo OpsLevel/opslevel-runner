@@ -21,6 +21,11 @@ type MapStructureRunnerJobVariable struct {
 	Sensitive bool   `mapstructure:"sensitive"`
 }
 
+type MapStructureRunnerJobFile struct {
+	Name     string `mapstructure:"name"`
+	Contents string `mapstructure:"contents"`
+}
+
 func startFaktory(mgr *worker.Manager) {
 	log.Info().Msgf("Starting faktory worker")
 	err := mgr.Run() // blocking
@@ -57,6 +62,37 @@ func prepareJob(helper worker.Helper, job opslevel.RunnerJob) (opslevel.RunnerJo
 				Key:       extraVar.Key,
 				Value:     extraVar.Value,
 				Sensitive: extraVar.Sensitive,
+			})
+		}
+	}
+
+	image, ok := helper.Custom("opslevel-runner-image")
+	if ok {
+		switch v := image.(type) {
+		case string:
+			job.Image = v
+		}
+	}
+
+	commands, ok := helper.Custom("opslevel-runner-commands")
+	if ok {
+		switch v := commands.(type) {
+		case []string:
+			job.Commands = v
+		}
+	}
+
+	extraFiles, ok := helper.Custom("opslevel-runner-files")
+	if ok {
+		var files []MapStructureRunnerJobFile
+		err := mapstructure.Decode(extraFiles, &files)
+		if err != nil {
+			return job, err
+		}
+		for _, file := range files {
+			job.Files = append(job.Files, opslevel.RunnerJobFile{
+				Name:     file.Name,
+				Contents: file.Contents,
 			})
 		}
 	}
