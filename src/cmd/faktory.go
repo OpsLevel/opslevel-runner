@@ -66,14 +66,14 @@ func prepareJob(helper worker.Helper, job opslevel.RunnerJob) (opslevel.RunnerJo
 		}
 	}
 
-	image, ok := helper.Custom("opslevel-runner-image")
+	overrideImage, ok := helper.Custom("opslevel-runner-image")
 	if ok {
-		switch v := image.(type) {
-		case string:
-			job.Image = v
-		default:
-			log.Warn().Msgf("opslevel-runner-image is unexpected type '%T' value was '%v'", image, image)
+		var image string
+		err := mapstructure.Decode(overrideImage, &image)
+		if err != nil {
+			return job, err
 		}
+		job.Image = image
 	}
 
 	extraCommands, ok := helper.Custom("opslevel-runner-commands")
