@@ -72,7 +72,7 @@ func prepareJob(helper worker.Helper, job opslevel.RunnerJob) (opslevel.RunnerJo
 		case string:
 			job.Image = v
 		default:
-			log.Warn().Msgf("opslevel-runner-image is unexpected type '%T' value was '%v'", image)
+			log.Warn().Msgf("opslevel-runner-image is unexpected type '%T' value was '%v'", image, image)
 		}
 	}
 
@@ -82,7 +82,7 @@ func prepareJob(helper worker.Helper, job opslevel.RunnerJob) (opslevel.RunnerJo
 		case []string:
 			job.Commands = v
 		default:
-			log.Warn().Msgf("opslevel-runner-commands is unexpected type '%T' value was '%v'", commands)
+			log.Warn().Msgf("opslevel-runner-commands is unexpected type '%T' value was '%v'", commands, commands)
 		}
 	}
 
@@ -100,8 +100,6 @@ func prepareJob(helper worker.Helper, job opslevel.RunnerJob) (opslevel.RunnerJo
 			})
 		}
 	}
-
-	// TODO: We should also parse opslevel-runner-extra-files so they can be supplied via custom data
 
 	batch := helper.Bid()
 	if batch != "" {
