@@ -35,7 +35,20 @@ func startFaktory(mgr *worker.Manager) {
 	log.Info().Msgf("Stopping faktory worker")
 }
 
-func prepareJob(helper worker.Helper, job opslevel.RunnerJob) (opslevel.RunnerJob, error) {
+func parseJob(args []any, job *opslevel.RunnerJob) error {
+	data, err := json.Marshal(args[0])
+	if err != nil {
+		log.Error().Err(err).Msgf("failed to marshal job data: %v", args[0])
+		return err
+	}
+	if err = json.Unmarshal(data, &job); err != nil {
+		log.Error().Err(err).Msgf("failed to unmarshal job data: %v", string(data))
+		return err
+	}
+	return nil
+}
+
+func extractJobId(helper worker.Helper, job *opslevel.RunnerJob) {
 	// args[0]["id"] is a factory reserved job id so we need to get the opslevel job id a different way
 	jobID, ok := helper.Custom("opslevel-runner-job-id")
 	if ok {
@@ -49,54 +62,47 @@ func prepareJob(helper worker.Helper, job opslevel.RunnerJob) (opslevel.RunnerJo
 			log.Warn().Msgf("opslevel-runner-job-id is unexpected type '%T' value was '%v'", jobID, jobID)
 		}
 	}
+}
 
+func extractCustomImage(helper worker.Helper, job *opslevel.RunnerJob) error {
+	overrideImage, ok := helper.Custom("opslevel-runner-image")
+	if ok {
+		var image string
+		err := mapstructure.Decode(overrideImage, &image)
+		if err != nil {
+			return err
+		}
+		job.Image = image
+	}
+	return nil
+}
+
+func extractCustomExtraCommands(helper worker.Helper, job *opslevel.RunnerJob) error {
+	extraCommands, ok := helper.Custom("opslevel-runner-commands")
+	if ok {
+		var commands []string
+		err := mapstructure.Decode(extraCommands, &commands)
+		if err != nil {
+			return err
+		}
+		job.Commands = append(job.Commands, commands...)
+	}
+	return nil
+}
+
+func extractCustomExtraVars(helper worker.Helper, job *opslevel.RunnerJob) error {
 	extraVars, ok := helper.Custom("opslevel-runner-extra-vars")
 	if ok {
 		var castedVars []MapStructureRunnerJobVariable
 		err := mapstructure.Decode(extraVars, &castedVars)
 		if err != nil {
-			return job, err
+			return err
 		}
 		for _, extraVar := range castedVars {
 			job.Variables = append(job.Variables, opslevel.RunnerJobVariable{
 				Key:       extraVar.Key,
 				Value:     extraVar.Value,
 				Sensitive: extraVar.Sensitive,
-			})
-		}
-	}
-
-	overrideImage, ok := helper.Custom("opslevel-runner-image")
-	if ok {
-		var image string
-		err := mapstructure.Decode(overrideImage, &image)
-		if err != nil {
-			return job, err
-		}
-		job.Image = image
-	}
-
-	extraCommands, ok := helper.Custom("opslevel-runner-commands")
-	if ok {
-		var commands []string
-		err := mapstructure.Decode(extraCommands, &commands)
-		if err != nil {
-			return job, err
-		}
-		job.Commands = append(job.Commands, commands...)
-	}
-
-	extraFiles, ok := helper.Custom("opslevel-runner-files")
-	if ok {
-		var files []MapStructureRunnerJobFile
-		err := mapstructure.Decode(extraFiles, &files)
-		if err != nil {
-			return job, err
-		}
-		for _, file := range files {
-			job.Files = append(job.Files, opslevel.RunnerJobFile{
-				Name:     file.Name,
-				Contents: file.Contents,
 			})
 		}
 	}
@@ -130,21 +136,25 @@ func prepareJob(helper worker.Helper, job opslevel.RunnerJob) (opslevel.RunnerJo
 		Value:     string(job.Id),
 		Sensitive: false,
 	})
-	return job, nil
+	return nil
 }
 
-func parseJob(args []any) (opslevel.RunnerJob, error) {
-	data, err := json.Marshal(args[0])
-	if err != nil {
-		log.Error().Err(err).Msgf("failed to marshal job data: %v", args[0])
-		return opslevel.RunnerJob{}, err
+func extractCustomExtraFiles(helper worker.Helper, job *opslevel.RunnerJob) error {
+	extraFiles, ok := helper.Custom("opslevel-runner-files")
+	if ok {
+		var files []MapStructureRunnerJobFile
+		err := mapstructure.Decode(extraFiles, &files)
+		if err != nil {
+			return err
+		}
+		for _, file := range files {
+			job.Files = append(job.Files, opslevel.RunnerJobFile{
+				Name:     file.Name,
+				Contents: file.Contents,
+			})
+		}
 	}
-	var job opslevel.RunnerJob
-	if err = json.Unmarshal(data, &job); err != nil {
-		log.Error().Err(err).Msgf("failed to unmarshal job data: %v", string(data))
-		return opslevel.RunnerJob{}, err
-	}
-	return job, nil
+	return nil
 }
 
 func runJob(helper worker.Helper, job opslevel.RunnerJob) pkg.JobOutcome {
@@ -185,15 +195,29 @@ func emitJobCompleteMetrics(jobStart time.Time, job opslevel.RunnerJob, outcome 
 func legacyJobHandler(ctx context.Context, args ...interface{}) error {
 	jobStart := emitJobStartedMetrics()
 
-	job, err := parseJob(args)
-	if err != nil {
+	helper := worker.HelperFor(ctx)
+
+	var job opslevel.RunnerJob
+
+	if err := parseJob(args, &job); err != nil {
 		return err
 	}
 
-	helper := worker.HelperFor(ctx)
+	extractJobId(helper, &job)
 
-	job, err = prepareJob(helper, job)
-	if err != nil {
+	if err := extractCustomImage(helper, &job); err != nil {
+		return err
+	}
+
+	if err := extractCustomExtraCommands(helper, &job); err != nil {
+		return err
+	}
+
+	if err := extractCustomExtraVars(helper, &job); err != nil {
+		return err
+	}
+
+	if err := extractCustomExtraFiles(helper, &job); err != nil {
 		return err
 	}
 
