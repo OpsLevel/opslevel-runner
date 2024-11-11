@@ -75,7 +75,7 @@ jobs:
         run: |
           gh release delete ${{ steps.version.outputs.RELEASE_VERSION }} || true
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v6.0.0
+        uses: goreleaser/goreleaser-action@v6.1.0
         with:
           args: release --clean --release-notes=../.changes/${{ steps.version.outputs.RELEASE_VERSION }}.md
           workdir: ./src
