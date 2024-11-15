@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -127,6 +128,13 @@ func (s *JobRunner) getConfigMapObject(identifier string, job opslevel.RunnerJob
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      identifier,
 			Namespace: s.jobPodConfig.Namespace,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "v1",
+					Kind:       "Pod",
+					Name:       identifier,
+				},
+			},
 		},
 		Immutable: opslevel.RefOf(true),
 		Data:      data,
