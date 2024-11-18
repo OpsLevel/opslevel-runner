@@ -127,6 +127,13 @@ func (s *JobRunner) getConfigMapObject(identifier string, job opslevel.RunnerJob
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      identifier,
 			Namespace: s.jobPodConfig.Namespace,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "v1",
+					Kind:       "Pod",
+					Name:       identifier,
+				},
+			},
 		},
 		Immutable: opslevel.RefOf(true),
 		Data:      data,
@@ -139,6 +146,13 @@ func (s *JobRunner) getPBDObject(identifier string, selector *metav1.LabelSelect
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      identifier,
 			Namespace: s.jobPodConfig.Namespace,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "v1",
+					Kind:       "Pod",
+					Name:       identifier,
+				},
+			},
 		},
 		Spec: policyv1.PodDisruptionBudgetSpec{
 			MaxUnavailable: &maxUnavailable,
