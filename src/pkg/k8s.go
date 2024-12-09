@@ -390,7 +390,7 @@ func (s *JobRunner) ExecWithConfig(config JobConfig) error {
 	if err != nil {
 		return err
 	}
-	return exec.Stream(remotecommand.StreamOptions{
+	return exec.StreamWithContext(context.TODO(), remotecommand.StreamOptions{
 		Stdin:  config.Stdin,
 		Stdout: config.Stdout,
 		Stderr: config.Stderr,
@@ -425,9 +425,8 @@ func (s *JobRunner) CreatePod(config *corev1.Pod) (*corev1.Pod, error) {
 	return s.clientset.CoreV1().Pods(config.Namespace).Create(context.TODO(), config, metav1.CreateOptions{})
 }
 
-func (s *JobRunner) WaitForPod(podConfig *corev1.Pod, timeout time.Duration) error {
-	s.logger.Debug().Msgf("Waiting for pod %s/%s to be ready in %s ...", podConfig.Namespace, podConfig.Name, timeout)
-	return wait.PollImmediate(time.Second, timeout, func() (bool, error) {
+func (s *JobRunner) isPodInDesiredState(podConfig *corev1.Pod) wait.ConditionWithContextFunc {
+	return func(context.Context) (bool, error) {
 		pod, err := s.clientset.CoreV1().Pods(podConfig.Namespace).Get(context.TODO(), podConfig.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -439,7 +438,12 @@ func (s *JobRunner) WaitForPod(podConfig *corev1.Pod, timeout time.Duration) err
 			return false, fmt.Errorf("pod ran to completion")
 		}
 		return false, nil
-	})
+	}
+}
+
+func (s *JobRunner) WaitForPod(podConfig *corev1.Pod, timeout time.Duration) error {
+	s.logger.Debug().Msgf("Waiting for pod %s/%s to be ready in %s ...", podConfig.Namespace, podConfig.Name, timeout)
+	return wait.PollUntilContextCancel(context.TODO(), timeout, false, s.isPodInDesiredState(podConfig))
 }
 
 func (s *JobRunner) DeleteConfigMap(config *corev1.ConfigMap) {
