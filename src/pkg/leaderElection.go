@@ -98,7 +98,8 @@ func RunLeaderElection(client *clientset.Clientset, runnerId opslevel.ID, lockNa
 func getReplicaCount(runnerId opslevel.ID, currentReplicas int) (int32, error) {
 	clientGQL := NewGraphClient()
 	jobConcurrency := int(math.Max(float64(viper.GetInt("job-concurrency")), 1))
-	runnerScale, err := clientGQL.RunnerScale(runnerId, currentReplicas, jobConcurrency)
+	jobConcurrencyFactor := int(math.Max(float64(viper.GetInt("job-concurrency-factor")), 1))
+	runnerScale, err := clientGQL.RunnerScale(runnerId, currentReplicas, jobConcurrency*jobConcurrencyFactor)
 	if err != nil {
 		return 0, err
 	}

@@ -31,6 +31,7 @@ func init() {
 	runCmd.Flags().String("mode", "api", "Whether to use the 'api' or 'faktory' for jobs.")
 	runCmd.Flags().StringArray("queues", []string{"default"}, "The faktory queues to target.")
 	runCmd.Flags().Int("job-concurrency", 3, "The number jobs this runner will handle in parallel.")
+	runCmd.Flags().Int("job-concurrency-factor", 100, "The scale factor of jobs concurrency used to calculate the runner scale based on queue depth.")
 	runCmd.Flags().Int("poll-interval", 10, "The amount of time in seconds between API calls to find pending jobs.")
 	runCmd.Flags().Int("metrics-port", 10354, "The port on which to bind the metrics endpoint to.")
 	runCmd.Flags().Int("log-max-bytes", 512000, "The max amount in bytes before job logs will be sent to OpsLevel.")
