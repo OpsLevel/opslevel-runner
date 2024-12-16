@@ -1,0 +1,3 @@
+kind: Dependency
+body: Bump go.opentelemetry.io/otel from 1.32.0 to 1.33.0 in /src
+time: 2024-12-16T16:33:38.58879533Z
