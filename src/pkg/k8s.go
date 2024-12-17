@@ -444,7 +444,7 @@ func (s *JobRunner) isPodInDesiredState(podConfig *corev1.Pod) wait.ConditionWit
 
 func (s *JobRunner) WaitForPod(podConfig *corev1.Pod, timeout time.Duration) error {
 	s.logger.Debug().Msgf("Waiting for pod %s/%s to be ready in %s ...", podConfig.Namespace, podConfig.Name, timeout)
-	return wait.PollUntilContextCancel(context.TODO(), timeout, false, s.isPodInDesiredState(podConfig))
+	return wait.PollUntilContextTimeout(context.Background(), time.Second, timeout, false, s.isPodInDesiredState(podConfig))
 }
 
 func (s *JobRunner) DeleteConfigMap(config *corev1.ConfigMap) {
