@@ -6,9 +6,9 @@ require (
 	github.com/contribsys/faktory v1.9.1
 	github.com/contribsys/faktory_worker_go v1.7.0
 	github.com/getsentry/sentry-go v0.29.1
-	github.com/go-resty/resty/v2 v2.16.0
+	github.com/go-resty/resty/v2 v2.16.2
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/opslevel/opslevel-go/v2024 v2024.11.8
+	github.com/opslevel/opslevel-go/v2024 v2024.12.24
 	github.com/prometheus/client_golang v1.20.5
 	github.com/rocktavious/autopilot/v2023 v2023.12.7
 	github.com/rs/zerolog v1.33.0
@@ -41,7 +41,7 @@ require (
 	github.com/go-openapi/swag v0.22.3 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
-	github.com/go-playground/validator/v10 v10.22.1 // indirect
+	github.com/go-playground/validator/v10 v10.23.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
@@ -78,7 +78,7 @@ require (
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.55.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
-	github.com/relvacode/iso8601 v1.5.0 // indirect
+	github.com/relvacode/iso8601 v1.6.0 // indirect
 	github.com/sagikazarmark/locafero v0.4.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
