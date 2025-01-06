@@ -4,21 +4,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/opslevel/opslevel-runner/signal"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/getsentry/sentry-go"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/trace"
-	clientset "k8s.io/client-go/kubernetes"
-
 	"github.com/opslevel/opslevel-go/v2024"
 	"github.com/opslevel/opslevel-runner/pkg"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // previewCmd represents the preview command
@@ -58,20 +57,17 @@ func doRun(cmd *cobra.Command, args []string) {
 
 		pkg.StartMetricsServer(string(runner.Id), viper.GetInt("metrics-port"))
 
+		ctx := signal.Init(context.Background())
+
 		if viper.GetBool("scaling-enabled") {
-			config, err := pkg.GetKubernetesConfig()
-			pkg.CheckErr(err)
-
-			k8sClient := clientset.NewForConfigOrDie(config)
-
-			log.Info().Msgf("electing leader...")
-			go electLeader(k8sClient, runner.Id)
+			leaseLockName := viper.GetString("runner-deployment")
+			leaseLockNamespace := viper.GetString("runner-pod-namespace")
+			lockIdentity := viper.GetString("runner-pod-name")
+			cobra.CheckErr(pkg.RunLeaderElection(ctx, runner.Id, leaseLockName, lockIdentity, leaseLockNamespace))
 		}
 
-		stop := pkg.InitSignalHandler()
-		wg := startWorkers(runner.Id, stop)
-		<-stop // Enter Forever Loop
-		log.Info().Msgf("interupt - waiting for jobs to complete ...")
+		wg := startWorkers(ctx, runner.Id)
+		time.Sleep(1 * time.Second)
 		wg.Wait()
 		log.Info().Msgf("Unregister runner for id '%s'...", runner.Id)
 		err = client.RunnerUnregister(runner.Id)
@@ -81,23 +77,15 @@ func doRun(cmd *cobra.Command, args []string) {
 	}
 }
 
-func electLeader(k8sClient *clientset.Clientset, runnerId opslevel.ID) {
-	leaseLockName := viper.GetString("runner-deployment")
-	leaseLockNamespace := viper.GetString("runner-pod-namespace")
-	lockIdentity := viper.GetString("runner-pod-name")
-
-	pkg.RunLeaderElection(k8sClient, runnerId, leaseLockName, lockIdentity, leaseLockNamespace)
-}
-
-func startWorkers(runnerId opslevel.ID, stop <-chan struct{}) *sync.WaitGroup {
+func startWorkers(ctx context.Context, runnerId opslevel.ID) *sync.WaitGroup {
 	wg := sync.WaitGroup{}
 	concurrency := getConcurrency()
 	wg.Add(concurrency)
 	jobQueue := make(chan opslevel.RunnerJob)
 	for w := 1; w <= concurrency; w++ {
-		go jobWorker(&wg, w, runnerId, jobQueue)
+		go jobWorker(ctx, &wg, w, runnerId, jobQueue)
 	}
-	go jobPoller(runnerId, stop, jobQueue)
+	go jobPoller(ctx, runnerId, jobQueue)
 	return &wg
 }
 
@@ -109,7 +97,7 @@ func getConcurrency() int {
 	return concurrency
 }
 
-func jobWorker(wg *sync.WaitGroup, index int, runnerId opslevel.ID, jobQueue <-chan opslevel.RunnerJob) {
+func jobWorker(ctx context.Context, wg *sync.WaitGroup, index int, runnerId opslevel.ID, jobQueue <-chan opslevel.RunnerJob) {
 	logMaxBytes := viper.GetInt("job-pod-log-max-size")
 	logMaxDuration := time.Duration(viper.GetInt("job-pod-log-max-interval")) * time.Second
 	logPrefix := func() string { return fmt.Sprintf("%s [%d] ", time.Now().UTC().Format(time.RFC3339), index) }
@@ -122,7 +110,6 @@ func jobWorker(wg *sync.WaitGroup, index int, runnerId opslevel.ID, jobQueue <-c
 	logger.Info().Msgf("Starting job processor %d ...", index)
 	defer wg.Done()
 	for job := range jobQueue {
-		ctx := context.Background()
 		jobId := job.Id
 		jobNumber := job.Number()
 
@@ -142,13 +129,13 @@ func jobWorker(wg *sync.WaitGroup, index int, runnerId opslevel.ID, jobQueue <-c
 		pkg.MetricJobsProcessing.Inc()
 		logger.Info().Msgf("Starting job '%s'", jobNumber)
 
-		go streamer.Run()
-		ctx, spanStart := tracer.Start(ctx, "start-job",
+		go streamer.Run(ctx)
+		traceCtx, spanStart := tracer.Start(ctx, "start-job",
 			trace.WithSpanKind(trace.SpanKindConsumer),
 			trace.WithAttributes(attribute.String("job", jobNumber)),
 		)
-		outcome := runner.Run(job, streamer.Stdout, streamer.Stderr)
-		_, spanFinish := tracer.Start(ctx,
+		outcome := runner.Run(ctx, job, streamer.Stdout, streamer.Stderr)
+		_, spanFinish := tracer.Start(traceCtx,
 			"finish-job",
 			trace.WithSpanKind(trace.SpanKindConsumer),
 			trace.WithAttributes(attribute.String("job", jobNumber)))
@@ -185,7 +172,7 @@ func jobWorker(wg *sync.WaitGroup, index int, runnerId opslevel.ID, jobQueue <-c
 	logger.Info().Msgf("Shutting down job processor %d ...", index)
 }
 
-func jobPoller(runnerId opslevel.ID, stop <-chan struct{}, jobQueue chan<- opslevel.RunnerJob) {
+func jobPoller(ctx context.Context, runnerId opslevel.ID, jobQueue chan<- opslevel.RunnerJob) {
 	logger := log.With().Int("worker", 0).Logger()
 	client := pkg.NewGraphClient()
 	token := opslevel.ID("")
@@ -193,7 +180,7 @@ func jobPoller(runnerId opslevel.ID, stop <-chan struct{}, jobQueue chan<- opsle
 	logger.Info().Msg("Starting polling for jobs")
 	for {
 		select {
-		case <-stop:
+		case <-ctx.Done():
 			logger.Info().Msg("Stopped Polling for jobs ...")
 			close(jobQueue)
 			return

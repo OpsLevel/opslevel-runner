@@ -3,6 +3,8 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"github.com/opslevel/opslevel-runner/signal"
+	"golang.org/x/net/context"
 	"os"
 	"time"
 
@@ -45,8 +47,10 @@ func doTest(cmd *cobra.Command, args []string) error {
 	)
 	runner := pkg.NewJobRunner("1")
 
-	go streamer.Run()
-	outcome := runner.Run(*job, streamer.Stdout, streamer.Stderr)
+	ctx := signal.Init(context.Background())
+
+	go streamer.Run(ctx)
+	outcome := runner.Run(ctx, *job, streamer.Stdout, streamer.Stderr)
 	streamer.Flush(outcome)
 
 	if outcome.Outcome != opslevel.RunnerJobOutcomeEnumSuccess {

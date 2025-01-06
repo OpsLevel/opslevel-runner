@@ -260,7 +260,7 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 }
 
 // TODO: Remove all usages of "Viper" they should be passed in at JobRunner configuration time
-func (s *JobRunner) Run(job opslevel.RunnerJob, stdout, stderr *SafeBuffer) JobOutcome {
+func (s *JobRunner) Run(ctx context.Context, job opslevel.RunnerJob, stdout, stderr *SafeBuffer) JobOutcome {
 	id := string(job.Id)
 	// Once we get off "the old API" method of runner we can circle back around to this
 	// and fix it to generate safe pod names since k8s has limitations.
@@ -323,7 +323,7 @@ func (s *JobRunner) Run(job opslevel.RunnerJob, stdout, stderr *SafeBuffer) JobO
 
 	workingDirectory := fmt.Sprintf("/jobs/%s/", id)
 	commands := append([]string{fmt.Sprintf("mkdir -p %s", workingDirectory), fmt.Sprintf("cd %s", workingDirectory), "set -xv"}, job.Commands...)
-	runErr := s.Exec(stdout, stderr, pod, pod.Spec.Containers[0].Name, viper.GetString("job-pod-shell"), "-e", "-c", strings.Join(commands, ";\n"))
+	runErr := s.Exec(ctx, stdout, stderr, pod, pod.Spec.Containers[0].Name, viper.GetString("job-pod-shell"), "-e", "-c", strings.Join(commands, ";\n"))
 	if runErr != nil {
 		return JobOutcome{
 			Message: fmt.Sprintf("pod execution failed REASON: %s %s", strings.TrimSuffix(stderr.String(), "\n"), runErr),
@@ -370,7 +370,7 @@ func GetKubernetesConfig() (*rest.Config, error) {
 	return config, nil
 }
 
-func (s *JobRunner) ExecWithConfig(config JobConfig) error {
+func (s *JobRunner) ExecWithConfig(ctx context.Context, config JobConfig) error {
 	req := s.clientset.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(config.PodName).
@@ -391,7 +391,7 @@ func (s *JobRunner) ExecWithConfig(config JobConfig) error {
 	if err != nil {
 		return err
 	}
-	return exec.StreamWithContext(context.TODO(), remotecommand.StreamOptions{
+	return exec.StreamWithContext(ctx, remotecommand.StreamOptions{
 		Stdin:  config.Stdin,
 		Stdout: config.Stdout,
 		Stderr: config.Stderr,
@@ -399,8 +399,8 @@ func (s *JobRunner) ExecWithConfig(config JobConfig) error {
 	})
 }
 
-func (s *JobRunner) Exec(stdout, stderr *SafeBuffer, pod *corev1.Pod, containerName string, cmd ...string) error {
-	return s.ExecWithConfig(JobConfig{
+func (s *JobRunner) Exec(ctx context.Context, stdout, stderr *SafeBuffer, pod *corev1.Pod, containerName string, cmd ...string) error {
+	return s.ExecWithConfig(ctx, JobConfig{
 		Command:       cmd,
 		Namespace:     pod.Namespace,
 		PodName:       pod.Name,
