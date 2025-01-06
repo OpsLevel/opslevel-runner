@@ -1,3 +1,0 @@
-kind: Bugfix
-body: Fixed issue where job pods could be orphaned during runner shutdown
-time: 2025-01-06T10:42:09.764156-06:00
