@@ -17,7 +17,13 @@ import (
 
 var isLeader bool
 
-func RunLeaderElection(client *clientset.Clientset, runnerId opslevel.ID, lockName, lockIdentity, lockNamespace string) {
+func RunLeaderElection(ctx context.Context, runnerId opslevel.ID, lockName, lockIdentity, lockNamespace string) error {
+	config, err := GetKubernetesConfig()
+	if err != nil {
+		return err
+	}
+	client := clientset.NewForConfigOrDie(config)
+
 	lock := &resourcelock.LeaseLock{
 		LeaseMeta: metav1.ObjectMeta{
 			Name:      lockName,
@@ -29,11 +35,9 @@ func RunLeaderElection(client *clientset.Clientset, runnerId opslevel.ID, lockNa
 		},
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	logger := log.With().Str("worker", "leader").Logger()
 
-	leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
+	go leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
 		Lock:            lock,
 		ReleaseOnCancel: true,
 		LeaseDuration:   15 * time.Second,
@@ -93,6 +97,7 @@ func RunLeaderElection(client *clientset.Clientset, runnerId opslevel.ID, lockNa
 			},
 		},
 	})
+	return nil
 }
 
 func getReplicaCount(runnerId opslevel.ID, currentReplicas int) (int32, error) {

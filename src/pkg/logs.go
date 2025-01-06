@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"container/ring"
+	"context"
 	"strings"
 	"time"
 
@@ -49,10 +50,13 @@ func (s *LogStreamer) GetLogBuffer() []string {
 	return output
 }
 
-func (s *LogStreamer) Run() {
+func (s *LogStreamer) Run(ctx context.Context) {
 	s.logger.Trace().Msg("Starting log streamer ...")
 	for {
 		select {
+		case <-ctx.Done():
+			s.logger.Trace().Msg("Shutting down log streamer ...")
+			return
 		case <-s.quit:
 			s.logger.Trace().Msg("Shutting down log streamer ...")
 			return

@@ -6,6 +6,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/opslevel/opslevel-runner/signal"
+	"golang.org/x/net/context"
+
 	"github.com/opslevel/opslevel-go/v2024"
 	"github.com/opslevel/opslevel-runner/pkg"
 	"github.com/rs/zerolog/log"
@@ -45,8 +48,10 @@ func doTest(cmd *cobra.Command, args []string) error {
 	)
 	runner := pkg.NewJobRunner("1")
 
-	go streamer.Run()
-	outcome := runner.Run(*job, streamer.Stdout, streamer.Stderr)
+	ctx := signal.Init(context.Background())
+
+	go streamer.Run(ctx)
+	outcome := runner.Run(ctx, *job, streamer.Stdout, streamer.Stderr)
 	streamer.Flush(outcome)
 
 	if outcome.Outcome != opslevel.RunnerJobOutcomeEnumSuccess {

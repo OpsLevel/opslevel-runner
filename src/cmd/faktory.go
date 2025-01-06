@@ -157,7 +157,7 @@ func extractCustomExtraFiles(helper worker.Helper, job *opslevel.RunnerJob) erro
 	return nil
 }
 
-func runJob(helper worker.Helper, job opslevel.RunnerJob) pkg.JobOutcome {
+func runJob(ctx context.Context, helper worker.Helper, job opslevel.RunnerJob) pkg.JobOutcome {
 	logger := log.With().Str("runner", "faktory").Logger()
 	logMaxBytes := viper.GetInt("job-pod-log-max-size")
 	logMaxDuration := time.Duration(viper.GetInt("job-pod-log-max-interval")) * time.Second
@@ -169,12 +169,12 @@ func runJob(helper worker.Helper, job opslevel.RunnerJob) pkg.JobOutcome {
 		pkg.NewPrefixLogProcessor(logPrefix),
 		pkg.NewFaktoryAppendJobLogProcessor(helper, logger, job.Id, logMaxBytes, logMaxDuration),
 	)
-	go streamer.Run()
+	go streamer.Run(ctx)
 
 	pkg.MetricJobsProcessing.Inc()
 	logger.Info().Msgf("Starting job '%s'", job.Id)
 	runner := pkg.NewJobRunner("faktory")
-	outcome := runner.Run(job, streamer.Stdout, streamer.Stderr)
+	outcome := runner.Run(ctx, job, streamer.Stdout, streamer.Stderr)
 	streamer.Flush(outcome)
 	return outcome
 }
@@ -221,7 +221,7 @@ func legacyJobHandler(ctx context.Context, args ...interface{}) error {
 		return err
 	}
 
-	outcome := runJob(helper, job)
+	outcome := runJob(ctx, helper, job)
 
 	emitJobCompleteMetrics(jobStart, job, outcome)
 	return nil
