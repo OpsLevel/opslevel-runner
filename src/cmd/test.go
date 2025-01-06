@@ -3,10 +3,11 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"github.com/opslevel/opslevel-runner/signal"
-	"golang.org/x/net/context"
 	"os"
 	"time"
+
+	"github.com/opslevel/opslevel-runner/signal"
+	"golang.org/x/net/context"
 
 	"github.com/opslevel/opslevel-go/v2024"
 	"github.com/opslevel/opslevel-runner/pkg"

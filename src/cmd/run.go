@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/opslevel/opslevel-runner/signal"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/opslevel/opslevel-runner/signal"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/opslevel/opslevel-go/v2024"
