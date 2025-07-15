@@ -1,0 +1,3 @@
+kind: Feature
+body: Add ability to configure more of the job pod's kubernetes settings - security context, annotations, service account, node selector, etc
+time: 2025-07-15T09:49:44.684245-04:00

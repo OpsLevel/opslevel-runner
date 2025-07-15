@@ -173,7 +173,7 @@ func runJob(ctx context.Context, helper worker.Helper, job opslevel.RunnerJob) p
 
 	pkg.MetricJobsProcessing.Inc()
 	logger.Info().Msgf("Starting job '%s'", job.Id)
-	runner := pkg.NewJobRunner("faktory")
+	runner := pkg.NewJobRunner("faktory", cfgFile)
 	outcome := runner.Run(ctx, job, streamer.Stdout, streamer.Stderr)
 	streamer.Flush(outcome)
 	return outcome

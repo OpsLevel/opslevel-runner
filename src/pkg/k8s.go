@@ -12,8 +12,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	"k8s.io/apimachinery/pkg/api/resource"
-
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,26 +43,17 @@ type JobConfig struct {
 }
 
 type JobRunner struct {
-	runnerId     string
-	logger       zerolog.Logger
-	config       *rest.Config
-	clientset    *kubernetes.Clientset
-	jobPodConfig JobPodConfig
+	runnerId  string
+	logger    zerolog.Logger
+	config    *rest.Config
+	clientset *kubernetes.Clientset
+	podConfig *K8SPodConfig
 }
 
 type JobOutcome struct {
 	Message          string
 	Outcome          opslevel.RunnerJobOutcomeEnum
 	OutcomeVariables []opslevel.RunnerJobOutcomeVariable
-}
-
-type JobPodConfig struct {
-	Namespace   string
-	Lifetime    int   // in seconds
-	CpuRequests int64 // in millicores!
-	MemRequests int64 // in MB
-	CpuLimit    int64 // in millicores!
-	MemLimit    int64 // in MB
 }
 
 func LoadK8SClient() {
@@ -79,18 +68,7 @@ func LoadK8SClient() {
 	k8sValidated = true
 }
 
-func newJobPodConfig() JobPodConfig {
-	return JobPodConfig{
-		Namespace:   viper.GetString("job-pod-namespace"),
-		Lifetime:    viper.GetInt("job-pod-max-lifetime"),
-		CpuRequests: viper.GetInt64("job-pod-requests-cpu"),
-		MemRequests: viper.GetInt64("job-pod-requests-memory"),
-		CpuLimit:    viper.GetInt64("job-pod-limits-cpu"),
-		MemLimit:    viper.GetInt64("job-pod-limits-memory"),
-	}
-}
-
-func NewJobRunner(runnerId string) *JobRunner {
+func NewJobRunner(runnerId string, path string) *JobRunner {
 	if !k8sValidated {
 		// It's ok if this function panics because we wouldn't beable to run jobs anyway
 		LoadK8SClient()
@@ -98,12 +76,16 @@ func NewJobRunner(runnerId string) *JobRunner {
 	// We recreate the config & clients here to ensure goroutine parallel problems don't raise their head
 	config, _ := GetKubernetesConfig()
 	client, _ := GetKubernetesClientset()
+	pod, err := ReadPodConfig(path)
+	if err != nil {
+		panic(err)
+	}
 	return &JobRunner{
-		runnerId:     runnerId,
-		logger:       log.With().Str("runner", runnerId).Logger(),
-		config:       config,
-		clientset:    client,
-		jobPodConfig: newJobPodConfig(),
+		runnerId:  runnerId,
+		logger:    log.With().Str("runner", runnerId).Logger(),
+		config:    config,
+		clientset: client,
+		podConfig: pod,
 	}
 }
 
@@ -126,7 +108,7 @@ func (s *JobRunner) getConfigMapObject(identifier string, job opslevel.RunnerJob
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      identifier,
-			Namespace: s.jobPodConfig.Namespace,
+			Namespace: s.podConfig.Namespace,
 			// failed to create configmap REASON: ConfigMap "opslevel-job-3163545-1734383310" is invalid: metadata.ownerReferences.uid: Invalid value: "": uid must not be empty
 			//OwnerReferences: []metav1.OwnerReference{
 			//	{
@@ -146,7 +128,7 @@ func (s *JobRunner) getPBDObject(identifier string, selector *metav1.LabelSelect
 	return &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      identifier,
-			Namespace: s.jobPodConfig.Namespace,
+			Namespace: s.podConfig.Namespace,
 			//OwnerReferences: []metav1.OwnerReference{
 			//	{
 			//		APIVersion: "v1",
@@ -168,25 +150,26 @@ func executable() *int32 {
 }
 
 func (s *JobRunner) getPodObject(identifier string, labels map[string]string, job opslevel.RunnerJob) *corev1.Pod {
-	// TODO: Allow configuration of PullPolicy
 	// TODO: Allow configuration of Labels
-	// TODO: Allow configuration of Annotations
 	// TODO: Allow configuration of Pod Command
-	// TODO: Allow configuration of TerminationGracePeriodSeconds
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      identifier,
-			Namespace: s.jobPodConfig.Namespace,
-			Labels:    labels,
+			Name:        identifier,
+			Namespace:   s.podConfig.Namespace,
+			Labels:      labels,
+			Annotations: s.podConfig.Annotations,
 		},
 		Spec: corev1.PodSpec{
-			TerminationGracePeriodSeconds: &[]int64{5}[0],
+			TerminationGracePeriodSeconds: &s.podConfig.TerminationGracePeriodSeconds,
 			RestartPolicy:                 corev1.RestartPolicyNever,
+			SecurityContext:               &s.podConfig.SecurityContext,
+			ServiceAccountName:            s.podConfig.ServiceAccountName,
+			NodeSelector:                  s.podConfig.NodeSelector,
 			InitContainers: []corev1.Container{
 				{
 					Name:            "helper",
 					Image:           "public.ecr.aws/opslevel/opslevel-runner:v2024.1.3", // TODO: fmt.Sprintf("public.ecr.aws/opslevel/opslevel-runner:v%s", ImageTagVersion),
-					ImagePullPolicy: corev1.PullIfNotPresent,
+					ImagePullPolicy: s.podConfig.PullPolicy,
 					Command: []string{
 						"cp",
 						"/opslevel-runner",
@@ -209,19 +192,10 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 					Command: []string{
 						"/bin/sh",
 						"-c",
-						fmt.Sprintf("sleep %d", s.jobPodConfig.Lifetime),
+						fmt.Sprintf("sleep %d", s.podConfig.Lifetime),
 					},
-					Resources: corev1.ResourceRequirements{
-						Requests: corev1.ResourceList{
-							corev1.ResourceCPU:    *resource.NewMilliQuantity(s.jobPodConfig.CpuRequests, resource.DecimalSI),
-							corev1.ResourceMemory: *resource.NewQuantity(s.jobPodConfig.MemRequests*1024*1024, resource.BinarySI),
-						},
-						Limits: corev1.ResourceList{
-							corev1.ResourceCPU:    *resource.NewMilliQuantity(s.jobPodConfig.CpuLimit, resource.DecimalSI),
-							corev1.ResourceMemory: *resource.NewQuantity(s.jobPodConfig.MemLimit*1024*1204, resource.BinarySI),
-						},
-					},
-					Env: s.getPodEnv(job.Variables),
+					Resources: s.podConfig.Resources,
+					Env:       s.getPodEnv(job.Variables),
 					VolumeMounts: []corev1.VolumeMount{
 						{
 							Name:      "scripts",

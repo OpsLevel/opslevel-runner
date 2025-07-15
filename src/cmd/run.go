@@ -106,7 +106,7 @@ func jobWorker(ctx context.Context, wg *sync.WaitGroup, index int, runnerId opsl
 	logger := log.With().Int("worker", index).Logger()
 	client := pkg.NewGraphClient()
 	tracer := pkg.GetTracer()
-	runner := pkg.NewJobRunner(string(runnerId))
+	runner := pkg.NewJobRunner(string(runnerId), cfgFile)
 
 	logger.Info().Msgf("Starting job processor %d ...", index)
 	defer wg.Done()
