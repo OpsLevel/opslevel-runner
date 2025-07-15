@@ -1,11 +1,12 @@
 package pkg
 
 import (
+	"os"
+
 	"github.com/spf13/viper"
-	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"os"
+	"sigs.k8s.io/yaml"
 )
 
 type Config struct {
