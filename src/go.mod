@@ -23,7 +23,7 @@ require (
 	k8s.io/api v0.30.7
 	k8s.io/apimachinery v0.30.7
 	k8s.io/client-go v0.30.7
-	sigs.k8s.io/yaml v1.3.0
+	sigs.k8s.io/yaml v1.6.0
 )
 
 require (
@@ -92,6 +92,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.32.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
+	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	golang.org/x/crypto v0.40.0 // indirect
 	golang.org/x/oauth2 v0.25.0 // indirect
 	golang.org/x/sys v0.34.0 // indirect
