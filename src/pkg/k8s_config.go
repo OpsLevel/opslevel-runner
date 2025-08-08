@@ -17,6 +17,7 @@ type K8SPodConfig struct {
 	Namespace                     string                      `yaml:"namespace"`
 	Lifetime                      int                         `yaml:"lifetime"` // in seconds
 	Shell                         string                      `yaml:"shell"`
+	WorkingDir                    string                      `yaml:"workingDir"`
 	Annotations                   map[string]string           `yaml:"annotations"`
 	Resources                     corev1.ResourceRequirements `yaml:"resources"`
 	ServiceAccountName            string                      `yaml:"serviceAccountName"`
@@ -30,9 +31,10 @@ type K8SPodConfig struct {
 func ReadPodConfig(path string) (*K8SPodConfig, error) {
 	config := Config{
 		Kubernetes: K8SPodConfig{
-			Namespace: viper.GetString("job-pod-namespace"),
-			Lifetime:  viper.GetInt("job-pod-max-lifetime"),
-			Shell:     viper.GetString("job-pod-shell"),
+			Namespace:  viper.GetString("job-pod-namespace"),
+			Lifetime:   viper.GetInt("job-pod-max-lifetime"),
+			Shell:      viper.GetString("job-pod-shell"),
+			WorkingDir: viper.GetString("job-pod-workdir"),
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
 					corev1.ResourceCPU:    *resource.NewMilliQuantity(viper.GetInt64("job-pod-requests-cpu"), resource.DecimalSI),

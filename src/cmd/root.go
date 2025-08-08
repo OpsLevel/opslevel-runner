@@ -47,6 +47,7 @@ func init() {
 	rootCmd.PersistentFlags().Int64("job-pod-limits-cpu", 1000, "The job pod resource limits cpu millicores.")
 	rootCmd.PersistentFlags().Int64("job-pod-limits-memory", 1024, "The job pod resource limits in MB.")
 	rootCmd.PersistentFlags().String("job-pod-shell", "/bin/sh", "The job pod shell to use for commands run inside the pod.")
+	rootCmd.PersistentFlags().String("job-pod-workdir", "/jobs", "The job pod working directory.")
 	rootCmd.PersistentFlags().Int("job-pod-log-max-interval", 30, "The max amount of time between when pod logs are shipped to OpsLevel. Works in tandem with 'job-pod-log-max-size'")
 	rootCmd.PersistentFlags().Int("job-pod-log-max-size", 1000000, "The max amount in bytes to buffer before pod logs are shipped to OpsLevel. Works in tandem with 'job-pod-log-max-interval'")
 
@@ -67,6 +68,7 @@ func init() {
 	viper.BindEnv("job-pod-max-lifetime", "OPSLEVEL_JOB_POD_MAX_LIFETIME")
 	viper.BindEnv("job-pod-namespace", "OPSLEVEL_JOB_POD_NAMESPACE")
 	viper.BindEnv("job-pod-shell", "OPSLEVEL_JOB_POD_SHELL")
+	viper.BindEnv("job-pod-workdir", "OPSLEVEL_JOB_POD_WORKDIR")
 	viper.BindEnv("job-pod-log-max-interval", "OPSLEVEL_JOB_POD_LOG_MAX_INTERVAL")
 	viper.BindEnv("job-pod-log-max-size", "OPSLEVEL_JOB_POD_LOG_MAX_SIZE")
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path"
 	"strings"
 	"time"
 
@@ -295,9 +296,9 @@ func (s *JobRunner) Run(ctx context.Context, job opslevel.RunnerJob, stdout, std
 		}
 	}
 
-	workingDirectory := fmt.Sprintf("/jobs/%s/", id)
+	workingDirectory := path.Join(s.podConfig.WorkingDir, id)
 	commands := append([]string{fmt.Sprintf("mkdir -p %s", workingDirectory), fmt.Sprintf("cd %s", workingDirectory), "set -xv"}, job.Commands...)
-	runErr := s.Exec(ctx, stdout, stderr, pod, pod.Spec.Containers[0].Name, viper.GetString("job-pod-shell"), "-e", "-c", strings.Join(commands, ";\n"))
+	runErr := s.Exec(ctx, stdout, stderr, pod, pod.Spec.Containers[0].Name, s.podConfig.Shell, "-e", "-c", strings.Join(commands, ";\n"))
 	if runErr != nil {
 		return JobOutcome{
 			Message: fmt.Sprintf("pod execution failed REASON: %s %s", strings.TrimSuffix(stderr.String(), "\n"), runErr),
