@@ -1,3 +1,0 @@
-kind: Feature
-body: Add ability to configure the job pod working directory using `--job-pod-workdir` or `OPSLEVEL_JOB_POD_WORKDIR` or the configuration file.
-time: 2025-08-08T11:11:06.018244-04:00
