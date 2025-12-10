@@ -150,9 +150,44 @@ func executable() *int32 {
 	return &value
 }
 
+func isCodingAgentJob(job opslevel.RunnerJob) bool {
+	return strings.Contains(job.Image, "coding-agent")
+}
+
 func (s *JobRunner) getPodObject(identifier string, labels map[string]string, job opslevel.RunnerJob) *corev1.Pod {
 	// TODO: Allow configuration of Labels
 	// TODO: Allow configuration of Pod Command
+
+	// hard-coded check to centralize privilege escalations to the runner codebase (i.e. deliberately not extensible)
+	isCodingAgent := isCodingAgentJob(job)
+
+	podSecurityContext := s.podConfig.SecurityContext
+	if isCodingAgent {
+		// Coding agent jobs need root user and group for Docker-in-Docker
+		runAsUser := int64(0)
+		fsGroup := int64(0)
+		podSecurityContext = corev1.PodSecurityContext{
+			RunAsUser: &runAsUser,
+			FSGroup:   &fsGroup,
+		}
+	}
+
+	var containerSecurityContext *corev1.SecurityContext
+	if isCodingAgent {
+		// Coding agent jobs need privileged mode for Docker-in-Docker
+		privileged := true
+		allowPrivilegeEscalation := true
+		// Add all capabilities explicitly to ensure unshare operations work
+		allCapabilities := corev1.Capabilities{
+			Add: []corev1.Capability{"ALL"},
+		}
+		containerSecurityContext = &corev1.SecurityContext{
+			Privileged:               &privileged,
+			AllowPrivilegeEscalation: &allowPrivilegeEscalation,
+			Capabilities:             &allCapabilities,
+		}
+	}
+
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        identifier,
@@ -163,9 +198,10 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 		Spec: corev1.PodSpec{
 			TerminationGracePeriodSeconds: &s.podConfig.TerminationGracePeriodSeconds,
 			RestartPolicy:                 corev1.RestartPolicyNever,
-			SecurityContext:               &s.podConfig.SecurityContext,
+			SecurityContext:               &podSecurityContext,
 			ServiceAccountName:            s.podConfig.ServiceAccountName,
 			NodeSelector:                  s.podConfig.NodeSelector,
+			HostNetwork:                   isCodingAgent, // Coding agent jobs need host network for Docker-in-Docker
 			InitContainers: []corev1.Container{
 				{
 					Name:            "helper",
@@ -195,8 +231,9 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 						"-c",
 						fmt.Sprintf("sleep %d", s.podConfig.Lifetime),
 					},
-					Resources: s.podConfig.Resources,
-					Env:       s.getPodEnv(job.Variables),
+					Resources:       s.podConfig.Resources,
+					Env:             s.getPodEnv(job.Variables),
+					SecurityContext: containerSecurityContext,
 					VolumeMounts: []corev1.VolumeMount{
 						{
 							Name:      "scripts",
