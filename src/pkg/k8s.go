@@ -153,6 +153,27 @@ func executable() *int32 {
 func (s *JobRunner) getPodObject(identifier string, labels map[string]string, job opslevel.RunnerJob) *corev1.Pod {
 	// TODO: Allow configuration of Labels
 	// TODO: Allow configuration of Pod Command
+
+	podSecurityContext := s.podConfig.SecurityContext
+	if s.podConfig.AgentMode {
+		// Agent mode jobs need root user for Docker daemon
+		runAsUser := int64(0)
+		fsGroup := int64(0)
+		podSecurityContext = corev1.PodSecurityContext{
+			RunAsUser: &runAsUser,
+			FSGroup:   &fsGroup,
+		}
+	}
+
+	var containerSecurityContext *corev1.SecurityContext
+	if s.podConfig.AgentMode {
+		// Agent mode jobs need privileged mode for creating containers within container
+		privileged := true
+		containerSecurityContext = &corev1.SecurityContext{
+			Privileged: &privileged,
+		}
+	}
+
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        identifier,
@@ -163,7 +184,7 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 		Spec: corev1.PodSpec{
 			TerminationGracePeriodSeconds: &s.podConfig.TerminationGracePeriodSeconds,
 			RestartPolicy:                 corev1.RestartPolicyNever,
-			SecurityContext:               &s.podConfig.SecurityContext,
+			SecurityContext:               &podSecurityContext,
 			ServiceAccountName:            s.podConfig.ServiceAccountName,
 			NodeSelector:                  s.podConfig.NodeSelector,
 			InitContainers: []corev1.Container{
@@ -195,8 +216,9 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 						"-c",
 						fmt.Sprintf("sleep %d", s.podConfig.Lifetime),
 					},
-					Resources: s.podConfig.Resources,
-					Env:       s.getPodEnv(job.Variables),
+					Resources:       s.podConfig.Resources,
+					Env:             s.getPodEnv(job.Variables),
+					SecurityContext: containerSecurityContext,
 					VolumeMounts: []corev1.VolumeMount{
 						{
 							Name:      "scripts",

@@ -1,0 +1,3 @@
+kind: Feature
+body: Add a new --job-agent-mode option, for creating privileged pods capable of container-in-container management
+time: 2025-12-10T09:18:50.207809-08:00
