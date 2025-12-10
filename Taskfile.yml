@@ -101,7 +101,7 @@ tasks:
     internal: true
     cmds:
       - task: go-install-tool
-        vars: { GO_TOOL: "changie", GO_TOOL_PATH: "github.com/miniscruff/changie@latest" }
+        vars: { GO_TOOL: "changie", GO_TOOL_PATH: "github.com/miniscruff/changie@v1.23.0" }
 
   install-gofumpt:
     desc: go install "gofumpt"
