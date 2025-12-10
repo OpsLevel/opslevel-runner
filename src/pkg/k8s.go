@@ -158,12 +158,12 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 	// TODO: Allow configuration of Labels
 	// TODO: Allow configuration of Pod Command
 
-	// hard-coded check to centralize privilege escalations to the runner codebase (i.e. deliberately not extensible)
+	// hard-coded check to centralize privilege escalations to the runner codebase (i.e. deliberately not part of job templates)
 	isCodingAgent := isCodingAgentJob(job)
 
 	podSecurityContext := s.podConfig.SecurityContext
 	if isCodingAgent {
-		// Coding agent jobs need root user and group for Docker-in-Docker
+		// Coding agent jobs need root user for Docker daemon
 		runAsUser := int64(0)
 		fsGroup := int64(0)
 		podSecurityContext = corev1.PodSecurityContext{
@@ -174,17 +174,10 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 
 	var containerSecurityContext *corev1.SecurityContext
 	if isCodingAgent {
-		// Coding agent jobs need privileged mode for Docker-in-Docker
+		// Coding agent jobs need privileged mode for creating containers within container
 		privileged := true
-		allowPrivilegeEscalation := true
-		// Add all capabilities explicitly to ensure unshare operations work
-		allCapabilities := corev1.Capabilities{
-			Add: []corev1.Capability{"ALL"},
-		}
 		containerSecurityContext = &corev1.SecurityContext{
-			Privileged:               &privileged,
-			AllowPrivilegeEscalation: &allowPrivilegeEscalation,
-			Capabilities:             &allCapabilities,
+			Privileged: &privileged,
 		}
 	}
 
@@ -201,7 +194,6 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 			SecurityContext:               &podSecurityContext,
 			ServiceAccountName:            s.podConfig.ServiceAccountName,
 			NodeSelector:                  s.podConfig.NodeSelector,
-			HostNetwork:                   isCodingAgent, // Coding agent jobs need host network for Docker-in-Docker
 			InitContainers: []corev1.Container{
 				{
 					Name:            "helper",
