@@ -150,20 +150,13 @@ func executable() *int32 {
 	return &value
 }
 
-func isCodingAgentJob(job opslevel.RunnerJob) bool {
-	return strings.Contains(job.Image, "coding-agent")
-}
-
 func (s *JobRunner) getPodObject(identifier string, labels map[string]string, job opslevel.RunnerJob) *corev1.Pod {
 	// TODO: Allow configuration of Labels
 	// TODO: Allow configuration of Pod Command
 
-	// hard-coded check to centralize privilege escalations to the runner codebase (i.e. deliberately not part of job templates)
-	isCodingAgent := isCodingAgentJob(job)
-
 	podSecurityContext := s.podConfig.SecurityContext
-	if isCodingAgent {
-		// Coding agent jobs need root user for Docker daemon
+	if s.podConfig.AgentMode {
+		// Agent mode jobs need root user for Docker daemon
 		runAsUser := int64(0)
 		fsGroup := int64(0)
 		podSecurityContext = corev1.PodSecurityContext{
@@ -173,8 +166,8 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 	}
 
 	var containerSecurityContext *corev1.SecurityContext
-	if isCodingAgent {
-		// Coding agent jobs need privileged mode for creating containers within container
+	if s.podConfig.AgentMode {
+		// Agent mode jobs need privileged mode for creating containers within container
 		privileged := true
 		containerSecurityContext = &corev1.SecurityContext{
 			Privileged: &privileged,

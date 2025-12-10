@@ -22,7 +22,7 @@ func TestCreateLabelSelector(t *testing.T) {
 	autopilot.Equals(t, labels, labelSelector.MatchLabels)
 }
 
-func TestGetPodObject_CodingAgentPrivileged(t *testing.T) {
+func TestGetPodObject_AgentModePrivileged(t *testing.T) {
 	// Arrange
 	runner := &JobRunner{
 		logger: zerolog.Nop(),
@@ -30,10 +30,11 @@ func TestGetPodObject_CodingAgentPrivileged(t *testing.T) {
 			Namespace:                     "test",
 			SecurityContext:               corev1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: 30,
+			AgentMode:                     true,
 		},
 	}
 	job := opslevel.RunnerJob{
-		Image: "jobs-coding-agent:latest",
+		Image: "alpine:latest",
 	}
 	labels := map[string]string{"app": "test"}
 
@@ -41,8 +42,8 @@ func TestGetPodObject_CodingAgentPrivileged(t *testing.T) {
 	pod := runner.getPodObject("test-pod", labels, job)
 
 	// Assert
-	autopilot.Assert(t, pod.Spec.Containers[0].SecurityContext != nil, "SecurityContext should be set for coding agent")
-	autopilot.Assert(t, pod.Spec.Containers[0].SecurityContext.Privileged != nil, "Privileged should be set for coding agent")
+	autopilot.Assert(t, pod.Spec.Containers[0].SecurityContext != nil, "SecurityContext should be set for agent mode")
+	autopilot.Assert(t, pod.Spec.Containers[0].SecurityContext.Privileged != nil, "Privileged should be set for agent mode")
 	autopilot.Equals(t, true, *pod.Spec.Containers[0].SecurityContext.Privileged)
 	autopilot.Equals(t, int64(0), *pod.Spec.SecurityContext.RunAsUser)
 	autopilot.Equals(t, int64(0), *pod.Spec.SecurityContext.FSGroup)

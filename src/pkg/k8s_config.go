@@ -26,6 +26,7 @@ type K8SPodConfig struct {
 	PullPolicy                    corev1.PullPolicy           `yaml:"pullPolicy"`
 	SecurityContext               corev1.PodSecurityContext   `yaml:"securityContext"`
 	NodeSelector                  map[string]string           `yaml:"nodeSelector"`
+	AgentMode                     bool                        `yaml:"agentMode"`
 }
 
 func ReadPodConfig(path string) (*K8SPodConfig, error) {
@@ -46,6 +47,7 @@ func ReadPodConfig(path string) (*K8SPodConfig, error) {
 				},
 			},
 			TerminationGracePeriodSeconds: 5,
+			AgentMode:                     viper.GetBool("job-agent-mode"),
 		},
 	}
 	// Early out with viper defaults if config file doesn't exist
