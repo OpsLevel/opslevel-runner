@@ -45,7 +45,7 @@ jobs:
         steps.changelog_check.outputs.exists == 'false'
       uses: miniscruff/changie-action@v2
       with:
-        version: latest
+        version: v1.23.0
         args: new --kind Dependency --body "${{ github.event.workflow_run.display_title }}"
 
     - name: Commit & Push changes
