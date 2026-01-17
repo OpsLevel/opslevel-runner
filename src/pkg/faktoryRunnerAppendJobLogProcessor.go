@@ -11,7 +11,6 @@ import (
 )
 
 type FaktoryAppendJobLogProcessor struct {
-	client            *faktory.Client
 	helper            faktoryWorker.Helper
 	logger            zerolog.Logger
 	jobId             opslevel.ID
@@ -25,9 +24,7 @@ type FaktoryAppendJobLogProcessor struct {
 }
 
 func NewFaktoryAppendJobLogProcessor(helper faktoryWorker.Helper, logger zerolog.Logger, jobId opslevel.ID, maxBytes int, maxTime time.Duration) *FaktoryAppendJobLogProcessor {
-	client, _ := faktory.Open()
 	return &FaktoryAppendJobLogProcessor{
-		client:            client,
 		helper:            helper,
 		logger:            logger,
 		jobId:             jobId,
@@ -104,7 +101,9 @@ func (s *FaktoryAppendJobLogProcessor) submit() {
 				s.logger.Error().Err(err).Msgf("error while enqueuing append logs for '%d' log line(s) for job '%s'", len(s.logLines), s.jobId)
 			}
 		} else {
-			err := s.client.Push(job)
+			err := s.helper.With(func(cl *faktory.Client) error {
+				return cl.Push(job)
+			})
 			if err != nil {
 				MetricEnqueueFailed.Inc()
 				s.logger.Error().Err(err).Msgf("error while enqueuing append logs for '%d' log line(s) for job '%s'", len(s.logLines), s.jobId)
