@@ -6,6 +6,7 @@ import (
 	"io"
 	"path"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -31,6 +32,11 @@ import (
 var (
 	ImageTagVersion string
 	k8sValidated    bool
+
+	k8sClientOnce   sync.Once
+	sharedK8sConfig *rest.Config
+	sharedK8sClient *kubernetes.Clientset
+	k8sInitError    error
 )
 
 type JobConfig struct {
@@ -57,13 +63,23 @@ type JobOutcome struct {
 	OutcomeVariables []opslevel.RunnerJobOutcomeVariable
 }
 
-func LoadK8SClient() {
-	// This function is used to ensure we can connect to k8s
-	// We don't cache the config or clients for goroutine parallel problems
-	if _, err := GetKubernetesConfig(); err != nil {
-		cobra.CheckErr(err)
+func GetSharedK8sClient() (*rest.Config, *kubernetes.Clientset, error) {
+	k8sClientOnce.Do(func() {
+		sharedK8sConfig, k8sInitError = GetKubernetesConfig()
+		if k8sInitError != nil {
+			return
+		}
+		sharedK8sClient, k8sInitError = kubernetes.NewForConfig(sharedK8sConfig)
+	})
+	if k8sInitError != nil {
+		return nil, nil, k8sInitError
 	}
-	if _, err := GetKubernetesClientset(); err != nil {
+	return sharedK8sConfig, sharedK8sClient, nil
+}
+
+func LoadK8SClient() {
+	_, _, err := GetSharedK8sClient()
+	if err != nil {
 		cobra.CheckErr(err)
 	}
 	k8sValidated = true
@@ -74,9 +90,8 @@ func NewJobRunner(runnerId string, path string) *JobRunner {
 		// It's ok if this function panics because we wouldn't beable to run jobs anyway
 		LoadK8SClient()
 	}
-	// We recreate the config & clients here to ensure goroutine parallel problems don't raise their head
-	config, _ := GetKubernetesConfig()
-	client, _ := GetKubernetesClientset()
+	// kubernetes.Clientset is thread-safe and designed to be shared across goroutines
+	config, client, _ := GetSharedK8sClient() // Already validated by LoadK8SClient
 	pod, err := ReadPodConfig(path)
 	if err != nil {
 		panic(err)
