@@ -11,7 +11,6 @@ import (
 )
 
 type FaktorySetOutcomeProcessor struct {
-	client                 *faktory.Client
 	helper                 faktoryWorker.Helper
 	logger                 zerolog.Logger
 	jobId                  opslevel.ID
@@ -20,9 +19,7 @@ type FaktorySetOutcomeProcessor struct {
 }
 
 func NewFaktorySetOutcomeProcessor(helper faktoryWorker.Helper, logger zerolog.Logger, jobId opslevel.ID) *FaktorySetOutcomeProcessor {
-	client, _ := faktory.Open()
 	return &FaktorySetOutcomeProcessor{
-		client:                 client,
 		helper:                 helper,
 		logger:                 logger,
 		jobId:                  jobId,
@@ -99,7 +96,9 @@ func (s *FaktorySetOutcomeProcessor) Flush(outcome JobOutcome) {
 			s.logger.Error().Err(err).Msgf("error when reporting outcome '%s' for job '%s'", outcome.Outcome, s.jobId)
 		}
 	} else {
-		err := s.client.Push(job)
+		err := s.helper.With(func(cl *faktory.Client) error {
+			return cl.Push(job)
+		})
 		if err != nil {
 			MetricEnqueueFailed.Inc()
 			s.logger.Error().Err(err).Msgf("error when reporting outcome '%s' for job '%s'", outcome.Outcome, s.jobId)

@@ -1,0 +1,3 @@
+kind: Bugfix
+body: 'We now correctly use client connection pools. '
+time: 2026-01-19T09:53:52.637279-05:00
