@@ -43,6 +43,19 @@ OPSLEVEL_API_TOKEN=XXX go run main.go test -f job.yaml
 cat job.yaml | OPSLEVEL_API_TOKEN=XXX go run main.go test -f -
 ```
 
+## End-to-End Testing with Faktory
+
+Run an end-to-end test with Faktory and a local Kubernetes cluster:
+```bash
+# Terminal 1: Start Faktory server and worker
+task start-faktory
+
+# Terminal 2: Enqueue test jobs (requires Faktory running)
+cd src && go run scripts/enqueue-test-jobs.go 50
+
+# Monitor jobs at http://localhost:7420
+```
+
 ## Architecture
 
 ### Entry Points (src/cmd/)
