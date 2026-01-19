@@ -358,19 +358,6 @@ func CreateLabelSelector(labels map[string]string) (*metav1.LabelSelector, error
 	return labelSelector, err
 }
 
-func GetKubernetesClientset() (*kubernetes.Clientset, error) {
-	config, err := GetKubernetesConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	client, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
-	return client, nil
-}
-
 func GetKubernetesConfig() (*rest.Config, error) {
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	configOverrides := &clientcmd.ConfigOverrides{}
