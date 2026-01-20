@@ -26,6 +26,5 @@ src/go.work**
 # ignore any user-created yaml files that may have been used for tophatting.
 src/*.yaml
 
-# agent folders
-.beads/
+# Git worktrees
 .worktrees/
