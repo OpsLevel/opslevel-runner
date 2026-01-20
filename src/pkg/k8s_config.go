@@ -43,7 +43,7 @@ func ReadPodConfig(path string) (*K8SPodConfig, error) {
 				},
 				Limits: corev1.ResourceList{
 					corev1.ResourceCPU:    *resource.NewMilliQuantity(viper.GetInt64("job-pod-limits-cpu"), resource.DecimalSI),
-					corev1.ResourceMemory: *resource.NewQuantity(viper.GetInt64("job-pod-limits-memory")*1024*1204, resource.BinarySI),
+					corev1.ResourceMemory: *resource.NewQuantity(viper.GetInt64("job-pod-limits-memory")*1024*1024, resource.BinarySI),
 				},
 			},
 			TerminationGracePeriodSeconds: 5,

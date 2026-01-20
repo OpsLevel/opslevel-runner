@@ -59,7 +59,7 @@ func (s *OpsLevelAppendLogProcessor) Process(line string) string {
 	s.elapsed += time.Since(s.lastTime)
 	if s.elapsed > s.maxTime {
 		s.logger.Trace().Msg("Shipping logs because of maxTime ...")
-		s.elapsed = time.Since(time.Now())
+		s.elapsed = 0
 		s.submit()
 	}
 	s.lastTime = time.Now()
