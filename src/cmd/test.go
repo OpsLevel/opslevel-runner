@@ -1,16 +1,15 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"time"
 
-	"github.com/opslevel/opslevel-runner/signal"
-	"golang.org/x/net/context"
-
 	"github.com/opslevel/opslevel-go/v2024"
 	"github.com/opslevel/opslevel-runner/pkg"
+	"github.com/opslevel/opslevel-runner/signal"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
