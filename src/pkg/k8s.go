@@ -297,31 +297,31 @@ func (s *JobRunner) Run(ctx context.Context, job opslevel.RunnerJob, stdout, std
 	}
 	// TODO: manage pods based on image for re-use?
 	cfgMap, err := s.CreateConfigMap(s.getConfigMapObject(identifier, job))
-	defer s.DeleteConfigMap(cfgMap) // TODO: if we reuse pods then delete should not happen?
 	if err != nil {
 		return JobOutcome{
 			Message: fmt.Sprintf("failed to create configmap REASON: %s", err),
 			Outcome: opslevel.RunnerJobOutcomeEnumFailed,
 		}
 	}
+	defer s.DeleteConfigMap(cfgMap) // TODO: if we reuse pods then delete should not happen?
 
 	pdb, err := s.CreatePDB(s.getPBDObject(identifier, labelSelector))
-	defer s.DeletePDB(pdb) // TODO: if we reuse pods then delete should not happen?
 	if err != nil {
 		return JobOutcome{
 			Message: fmt.Sprintf("failed to create pod disruption budget REASON: %s", err),
 			Outcome: opslevel.RunnerJobOutcomeEnumFailed,
 		}
 	}
+	defer s.DeletePDB(pdb) // TODO: if we reuse pods then delete should not happen?
 
 	pod, err := s.CreatePod(s.getPodObject(identifier, labels, job))
-	defer s.DeletePod(pod) // TODO: if we reuse pods then delete should not happen
 	if err != nil {
 		return JobOutcome{
 			Message: fmt.Sprintf("failed to create pod REASON: %s", err),
 			Outcome: opslevel.RunnerJobOutcomeEnumFailed,
 		}
 	}
+	defer s.DeletePod(pod) // TODO: if we reuse pods then delete should not happen
 
 	timeout := time.Second * time.Duration(viper.GetInt("job-pod-max-wait"))
 	waitErr := s.WaitForPod(pod, timeout)
