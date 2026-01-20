@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+@AGENTS.md
+
 ## Project Overview
 
 OpsLevel Runner is a Kubernetes-based job processor for OpsLevel. It polls for jobs from the OpsLevel API (or Faktory queue), spins up Kubernetes pods to execute commands, and streams logs back to OpsLevel.
