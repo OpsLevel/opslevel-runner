@@ -1,6 +1,7 @@
 package pkg
 
 import (
+	"context"
 	"testing"
 
 	"github.com/opslevel/opslevel-go/v2024"
@@ -79,7 +80,7 @@ func TestDeleteConfigMap_NilSafe(t *testing.T) {
 	}
 
 	// Act & Assert - should not panic when called with nil
-	runner.DeleteConfigMap(nil)
+	runner.DeleteConfigMap(context.Background(), nil)
 }
 
 func TestDeletePDB_NilSafe(t *testing.T) {
@@ -89,7 +90,7 @@ func TestDeletePDB_NilSafe(t *testing.T) {
 	}
 
 	// Act & Assert - should not panic when called with nil
-	runner.DeletePDB(nil)
+	runner.DeletePDB(context.Background(), nil)
 }
 
 func TestDeletePod_NilSafe(t *testing.T) {
@@ -99,7 +100,7 @@ func TestDeletePod_NilSafe(t *testing.T) {
 	}
 
 	// Act & Assert - should not panic when called with nil
-	runner.DeletePod(nil)
+	runner.DeletePod(context.Background(), nil)
 }
 
 func TestGetConfigMapObject(t *testing.T) {
@@ -164,9 +165,9 @@ func TestDeleteFunctions_RequireClientset(t *testing.T) {
 	// The defer fix prevents this by ensuring defer only runs after successful creation
 
 	// Verify nil resources are handled safely
-	runner.DeleteConfigMap(nil)
-	runner.DeletePDB(nil)
-	runner.DeletePod(nil)
+	runner.DeleteConfigMap(context.Background(), nil)
+	runner.DeletePDB(context.Background(), nil)
+	runner.DeletePod(context.Background(), nil)
 
 	// If we reach here, nil handling works correctly
 	t.Log("Delete functions correctly handle nil resources")

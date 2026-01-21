@@ -3,6 +3,7 @@ package pkg
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-resty/resty/v2"
@@ -13,9 +14,11 @@ import (
 )
 
 var (
-	_version    string
-	_clientRest *resty.Client
-	_clientGQL  *opslevel.Client
+	_version        string
+	_clientRest     *resty.Client
+	_clientGQL      *opslevel.Client
+	_clientRestOnce sync.Once
+	_clientGQLOnce  sync.Once
 )
 
 func SetClientVersion(version string) {
@@ -23,16 +26,16 @@ func SetClientVersion(version string) {
 }
 
 func NewRestClient() *resty.Client {
-	if _clientRest == nil {
+	_clientRestOnce.Do(func() {
 		_clientRest = opslevel.NewRestClient(opslevel.SetURL(viper.GetString("api-url")))
-	}
+	})
 	return _clientRest
 }
 
 func NewGraphClient() *opslevel.Client {
-	if _clientGQL == nil {
+	_clientGQLOnce.Do(func() {
 		_clientGQL = newGraphClient()
-	}
+	})
 	return _clientGQL
 }
 
@@ -57,7 +60,6 @@ func newGraphClient() *opslevel.Client {
 			cobra.CheckErr(clientErr)
 		}
 	}
-	cobra.CheckErr(clientErr)
 
 	return client
 }

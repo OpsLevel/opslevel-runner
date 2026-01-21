@@ -52,6 +52,8 @@ func (s *LogStreamer) GetLogBuffer() []string {
 
 func (s *LogStreamer) Run(ctx context.Context) {
 	s.logger.Trace().Msg("Starting log streamer ...")
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
@@ -60,7 +62,7 @@ func (s *LogStreamer) Run(ctx context.Context) {
 		case <-s.quit:
 			s.logger.Trace().Msg("Shutting down log streamer ...")
 			return
-		default:
+		case <-ticker.C:
 			for len(s.Stderr.String()) > 0 {
 				line, err := s.Stderr.ReadString('\n')
 				if err == nil {
@@ -89,12 +91,19 @@ func (s *LogStreamer) Run(ctx context.Context) {
 
 func (s *LogStreamer) Flush(outcome JobOutcome) {
 	s.logger.Trace().Msg("Starting log streamer flush ...")
-	for len(s.Stderr.String()) > 0 {
-		time.Sleep(200 * time.Millisecond)
+	ticker := time.NewTicker(200 * time.Millisecond)
+	defer ticker.Stop()
+	timeout := time.After(30 * time.Second)
+	for len(s.Stderr.String()) > 0 || len(s.Stdout.String()) > 0 {
+		select {
+		case <-ticker.C:
+			// Continue waiting
+		case <-timeout:
+			s.logger.Warn().Msg("Flush timeout reached, proceeding with remaining data")
+			goto done
+		}
 	}
-	for len(s.Stdout.String()) > 0 {
-		time.Sleep(200 * time.Millisecond)
-	}
+done:
 	s.logger.Trace().Msg("Finished log streamer flush ...")
 	s.quit <- true
 	time.Sleep(200 * time.Millisecond) // Allow 'Run' goroutine to quit
