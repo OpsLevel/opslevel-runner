@@ -3,6 +3,7 @@ package pkg
 import (
 	"context"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/opslevel/opslevel-go/v2024"
@@ -15,7 +16,22 @@ import (
 	"k8s.io/client-go/util/retry"
 )
 
-var isLeader bool
+var (
+	isLeader   bool
+	isLeaderMu sync.RWMutex
+)
+
+func setLeader(val bool) {
+	isLeaderMu.Lock()
+	defer isLeaderMu.Unlock()
+	isLeader = val
+}
+
+func getLeader() bool {
+	isLeaderMu.RLock()
+	defer isLeaderMu.RUnlock()
+	return isLeader
+}
 
 func RunLeaderElection(ctx context.Context, runnerId opslevel.ID, lockName, lockIdentity, lockNamespace string) error {
 	config, err := GetKubernetesConfig()
@@ -45,7 +61,7 @@ func RunLeaderElection(ctx context.Context, runnerId opslevel.ID, lockName, lock
 		RetryPeriod:     2 * time.Second,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(c context.Context) {
-				isLeader = true
+				setLeader(true)
 				logger.Info().Msgf("leader is %s", lockIdentity)
 				deploymentsClient := client.AppsV1().Deployments(lockNamespace)
 				for {
@@ -85,13 +101,13 @@ func RunLeaderElection(ctx context.Context, runnerId opslevel.ID, lockName, lock
 				}
 			},
 			OnStoppedLeading: func() {
-				isLeader = false
+				setLeader(false)
 			},
 			OnNewLeader: func(currentId string) {
-				if !isLeader && currentId == lockIdentity {
+				if !getLeader() && currentId == lockIdentity {
 					logger.Info().Msgf("%s started leading!", currentId)
 					return
-				} else if !isLeader && currentId != lockIdentity {
+				} else if !getLeader() && currentId != lockIdentity {
 					logger.Info().Msgf("leader is %s", currentId)
 				}
 			},

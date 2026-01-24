@@ -205,7 +205,7 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 			InitContainers: []corev1.Container{
 				{
 					Name:            "helper",
-					Image:           "public.ecr.aws/opslevel/opslevel-runner:v2024.1.3", // TODO: fmt.Sprintf("public.ecr.aws/opslevel/opslevel-runner:v%s", ImageTagVersion),
+					Image:           fmt.Sprintf("public.ecr.aws/opslevel/opslevel-runner:v%s", ImageTagVersion),
 					ImagePullPolicy: s.podConfig.PullPolicy,
 					Command: []string{
 						"cp",
@@ -297,31 +297,31 @@ func (s *JobRunner) Run(ctx context.Context, job opslevel.RunnerJob, stdout, std
 	}
 	// TODO: manage pods based on image for re-use?
 	cfgMap, err := s.CreateConfigMap(s.getConfigMapObject(identifier, job))
-	defer s.DeleteConfigMap(cfgMap) // TODO: if we reuse pods then delete should not happen?
 	if err != nil {
 		return JobOutcome{
 			Message: fmt.Sprintf("failed to create configmap REASON: %s", err),
 			Outcome: opslevel.RunnerJobOutcomeEnumFailed,
 		}
 	}
+	defer s.DeleteConfigMap(cfgMap) // TODO: if we reuse pods then delete should not happen?
 
 	pdb, err := s.CreatePDB(s.getPBDObject(identifier, labelSelector))
-	defer s.DeletePDB(pdb) // TODO: if we reuse pods then delete should not happen?
 	if err != nil {
 		return JobOutcome{
 			Message: fmt.Sprintf("failed to create pod disruption budget REASON: %s", err),
 			Outcome: opslevel.RunnerJobOutcomeEnumFailed,
 		}
 	}
+	defer s.DeletePDB(pdb) // TODO: if we reuse pods then delete should not happen?
 
 	pod, err := s.CreatePod(s.getPodObject(identifier, labels, job))
-	defer s.DeletePod(pod) // TODO: if we reuse pods then delete should not happen
 	if err != nil {
 		return JobOutcome{
 			Message: fmt.Sprintf("failed to create pod REASON: %s", err),
 			Outcome: opslevel.RunnerJobOutcomeEnumFailed,
 		}
 	}
+	defer s.DeletePod(pod) // TODO: if we reuse pods then delete should not happen
 
 	timeout := time.Second * time.Duration(viper.GetInt("job-pod-max-wait"))
 	waitErr := s.WaitForPod(pod, timeout)
@@ -447,6 +447,9 @@ func (s *JobRunner) WaitForPod(podConfig *corev1.Pod, timeout time.Duration) err
 }
 
 func (s *JobRunner) DeleteConfigMap(config *corev1.ConfigMap) {
+	if config == nil {
+		return
+	}
 	s.logger.Trace().Msgf("Deleting configmap %s/%s ...", config.Namespace, config.Name)
 	err := s.clientset.CoreV1().ConfigMaps(config.Namespace).Delete(context.TODO(), config.Name, metav1.DeleteOptions{})
 	if err != nil {
@@ -455,7 +458,10 @@ func (s *JobRunner) DeleteConfigMap(config *corev1.ConfigMap) {
 }
 
 func (s *JobRunner) DeletePDB(config *policyv1.PodDisruptionBudget) {
-	s.logger.Trace().Msgf("Deleting configmap %s/%s ...", config.Namespace, config.Name)
+	if config == nil {
+		return
+	}
+	s.logger.Trace().Msgf("Deleting pod disruption budget %s/%s ...", config.Namespace, config.Name)
 	err := s.clientset.PolicyV1().PodDisruptionBudgets(config.Namespace).Delete(context.TODO(), config.Name, metav1.DeleteOptions{})
 	if err != nil {
 		s.logger.Error().Err(err).Msgf("received error on PDB deletion")
@@ -463,6 +469,9 @@ func (s *JobRunner) DeletePDB(config *policyv1.PodDisruptionBudget) {
 }
 
 func (s *JobRunner) DeletePod(config *corev1.Pod) {
+	if config == nil {
+		return
+	}
 	s.logger.Trace().Msgf("Deleting pod %s/%s ...", config.Namespace, config.Name)
 	err := s.clientset.CoreV1().Pods(config.Namespace).Delete(context.TODO(), config.Name, metav1.DeleteOptions{})
 	if err != nil {
