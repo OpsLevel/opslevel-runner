@@ -97,6 +97,5 @@ func (s *OpsLevelAppendLogProcessor) submit() {
 		}
 	}
 	s.logLinesBytesSize = 0
-	s.logLines = nil
-	s.logLines = []string{}
+	s.logLines = s.logLines[:0]
 }
