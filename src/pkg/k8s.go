@@ -24,7 +24,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/remotecommand"
 
-	"github.com/opslevel/opslevel-go/v2024"
+	"github.com/opslevel/opslevel-go/v2026"
 	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
 )
@@ -126,6 +126,7 @@ func (s *JobRunner) getConfigMapObject(identifier string, job opslevel.RunnerJob
 	for _, file := range job.Files {
 		data[file.Name] = file.Contents
 	}
+	immutable := true
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      identifier,
@@ -139,7 +140,7 @@ func (s *JobRunner) getConfigMapObject(identifier string, job opslevel.RunnerJob
 			//	},
 			//},
 		},
-		Immutable: opslevel.RefOf(true),
+		Immutable: &immutable,
 		Data:      data,
 	}
 }

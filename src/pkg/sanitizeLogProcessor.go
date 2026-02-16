@@ -3,7 +3,7 @@ package pkg
 import (
 	"strings"
 
-	"github.com/opslevel/opslevel-go/v2024"
+	"github.com/opslevel/opslevel-go/v2026"
 )
 
 type SanitizeLogProcessor struct {

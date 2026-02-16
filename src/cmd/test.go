@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/opslevel/opslevel-go/v2024"
+	"github.com/opslevel/opslevel-go/v2026"
 	"github.com/opslevel/opslevel-runner/pkg"
 	"github.com/opslevel/opslevel-runner/signal"
 	"github.com/rs/zerolog/log"

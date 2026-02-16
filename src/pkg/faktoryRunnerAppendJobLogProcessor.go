@@ -6,7 +6,7 @@ import (
 
 	faktory "github.com/contribsys/faktory/client"
 	faktoryWorker "github.com/contribsys/faktory_worker_go"
-	"github.com/opslevel/opslevel-go/v2024"
+	"github.com/opslevel/opslevel-go/v2026"
 	"github.com/rs/zerolog"
 )
 

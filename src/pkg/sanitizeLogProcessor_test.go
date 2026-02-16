@@ -3,7 +3,7 @@ package pkg
 import (
 	"testing"
 
-	"github.com/opslevel/opslevel-go/v2024"
+	"github.com/opslevel/opslevel-go/v2026"
 	"github.com/rocktavious/autopilot/v2023"
 )
 

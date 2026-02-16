@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-resty/resty/v2"
 
-	"github.com/opslevel/opslevel-go/v2024"
+	"github.com/opslevel/opslevel-go/v2026"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

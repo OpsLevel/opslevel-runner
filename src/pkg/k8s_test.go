@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/opslevel/opslevel-go/v2024"
+	"github.com/opslevel/opslevel-go/v2026"
 	"github.com/rocktavious/autopilot/v2023"
 	"github.com/rs/zerolog"
 	corev1 "k8s.io/api/core/v1"

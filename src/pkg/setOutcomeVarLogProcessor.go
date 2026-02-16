@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/opslevel/opslevel-go/v2024"
+	"github.com/opslevel/opslevel-go/v2026"
 	"github.com/rs/zerolog"
 )
 
