@@ -11,7 +11,7 @@ import (
 	"github.com/opslevel/opslevel-runner/signal"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/opslevel/opslevel-go/v2024"
+	"github.com/opslevel/opslevel-go/v2026"
 	"github.com/opslevel/opslevel-runner/pkg"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -53,7 +53,12 @@ func doRun(cmd *cobra.Command, args []string) {
 		runFaktory()
 	case "api":
 		client := pkg.NewGraphClient()
-		runner, err := client.RunnerRegister()
+		var registerArgs []string
+		if queue := viper.GetString("queue"); queue != "" {
+			log.Info().Str("queue", queue).Msg("Registering with queue")
+			registerArgs = append(registerArgs, queue)
+		}
+		runner, err := client.RunnerRegister(registerArgs...)
 		pkg.CheckErr(err)
 
 		pkg.StartMetricsServer(string(runner.Id), viper.GetInt("metrics-port"))

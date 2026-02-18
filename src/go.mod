@@ -10,7 +10,7 @@ require (
 	github.com/getsentry/sentry-go v0.29.1
 	github.com/go-resty/resty/v2 v2.17.1
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/opslevel/opslevel-go/v2024 v2024.12.24
+	github.com/opslevel/opslevel-go/v2026 v2026.2.18
 	github.com/prometheus/client_golang v1.20.5
 	github.com/rocktavious/autopilot/v2023 v2023.12.7
 	github.com/rs/zerolog v1.34.0
@@ -28,7 +28,7 @@ require (
 require (
 	dario.cat/mergo v1.0.1 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
-	github.com/Masterminds/semver/v3 v3.3.0 // indirect
+	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/Masterminds/sprig/v3 v3.3.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -54,8 +54,6 @@ require (
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/gosimple/slug v1.15.0 // indirect
 	github.com/gosimple/unidecode v1.0.1 // indirect
-	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
-	github.com/hashicorp/go-retryablehttp v0.7.8 // indirect
 	github.com/hasura/go-graphql-client v0.15.1 // indirect
 	github.com/huandu/xstrings v1.5.0 // indirect
 	github.com/imdario/mergo v0.3.16 // indirect
@@ -108,4 +106,4 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
 
-//replace github.com/opslevel/opslevel-go/v2024 => ./submodules/opslevel-go
+// replace github.com/opslevel/opslevel-go/v2026 => /Users/jason/workspace/opslevel-go
