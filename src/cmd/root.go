@@ -51,7 +51,11 @@ func init() {
 	rootCmd.PersistentFlags().Int("job-pod-log-max-interval", 30, "The max amount of time between when pod logs are shipped to OpsLevel. Works in tandem with 'job-pod-log-max-size'")
 	rootCmd.PersistentFlags().Int("job-pod-log-max-size", 1000000, "The max amount in bytes to buffer before pod logs are shipped to OpsLevel. Works in tandem with 'job-pod-log-max-interval'")
 	rootCmd.PersistentFlags().Bool("job-agent-mode", false, "Enable agent mode with privileged security context for Container-in-Container support. WARNING: This grants elevated privileges and should only be enabled for trusted workloads.")
+	rootCmd.PersistentFlags().String("job-pod-helper-image", "", "Override the helper init container image. Defaults to the published ECR image matching the runner version. Useful for local development with kind.")
 	rootCmd.PersistentFlags().String("queue", "", "The queue this runner should process jobs from. Empty means the default queue.")
+
+	rootCmd.PersistentFlags().Int("k8s-api-qps", 50, "The maximum sustained queries per second to the Kubernetes API server.")
+	rootCmd.PersistentFlags().Int("k8s-api-burst", 100, "The maximum burst of queries to the Kubernetes API server.")
 
 	rootCmd.PersistentFlags().String("runner-pod-name", "", "overrides environment variable 'RUNNER_POD_NAME'")
 	rootCmd.PersistentFlags().String("runner-pod-namespace", "default", "The kubernetes namespace the runner pod is deployed in. Overrides environment variable 'RUNNER_POD_NAMESPACE'")
@@ -74,7 +78,11 @@ func init() {
 	viper.BindEnv("job-pod-log-max-interval", "OPSLEVEL_JOB_POD_LOG_MAX_INTERVAL")
 	viper.BindEnv("job-pod-log-max-size", "OPSLEVEL_JOB_POD_LOG_MAX_SIZE")
 	viper.BindEnv("job-agent-mode", "OPSLEVEL_JOB_AGENT_MODE")
+	viper.BindEnv("job-pod-helper-image", "OPSLEVEL_JOB_POD_HELPER_IMAGE")
 	viper.BindEnv("queue", "OPSLEVEL_QUEUE")
+
+	viper.BindEnv("k8s-api-qps", "OPSLEVEL_K8S_API_QPS")
+	viper.BindEnv("k8s-api-burst", "OPSLEVEL_K8S_API_BURST")
 
 	viper.BindEnv("runner-pod-name", "RUNNER_POD_NAME")
 	viper.BindEnv("runner-pod-namespace", "RUNNER_POD_NAMESPACE")
