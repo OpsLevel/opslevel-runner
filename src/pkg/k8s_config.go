@@ -1,6 +1,7 @@
 package pkg
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/spf13/viper"
@@ -27,6 +28,7 @@ type K8SPodConfig struct {
 	SecurityContext               corev1.PodSecurityContext   `yaml:"securityContext"`
 	NodeSelector                  map[string]string           `yaml:"nodeSelector"`
 	AgentMode                     bool                        `yaml:"agentMode"`
+	HelperImage                   string                      `yaml:"helperImage"`
 }
 
 func ReadPodConfig(path string) (*K8SPodConfig, error) {
@@ -48,6 +50,7 @@ func ReadPodConfig(path string) (*K8SPodConfig, error) {
 			},
 			TerminationGracePeriodSeconds: 5,
 			AgentMode:                     viper.GetBool("job-agent-mode"),
+			HelperImage:                   viper.GetString("job-pod-helper-image"),
 		},
 	}
 	// Early out with viper defaults if config file doesn't exist
@@ -64,4 +67,11 @@ func ReadPodConfig(path string) (*K8SPodConfig, error) {
 	}
 
 	return &config.Kubernetes, nil
+}
+
+func (c *K8SPodConfig) helperImage() string {
+	if c.HelperImage != "" {
+		return c.HelperImage
+	}
+	return fmt.Sprintf("public.ecr.aws/opslevel/opslevel-runner:v%s", ImageTagVersion)
 }

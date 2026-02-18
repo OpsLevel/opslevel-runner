@@ -211,7 +211,7 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 			InitContainers: []corev1.Container{
 				{
 					Name:            ContainerNameHelper,
-					Image:           fmt.Sprintf("public.ecr.aws/opslevel/opslevel-runner:v%s", ImageTagVersion),
+					Image:           s.podConfig.helperImage(),
 					ImagePullPolicy: s.podConfig.PullPolicy,
 					Command: []string{
 						"cp",
