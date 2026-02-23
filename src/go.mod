@@ -1,11 +1,9 @@
 module github.com/opslevel/opslevel-runner
 
-go 1.24.0
-
-toolchain go1.24.1
+go 1.25
 
 require (
-	github.com/contribsys/faktory v1.9.2
+	github.com/contribsys/faktory v1.9.4
 	github.com/contribsys/faktory_worker_go v1.7.0
 	github.com/getsentry/sentry-go v0.29.1
 	github.com/go-resty/resty/v2 v2.17.1
