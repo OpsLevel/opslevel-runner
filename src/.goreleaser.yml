@@ -23,14 +23,19 @@ builds:
     binary: '{{ .ProjectName }}'
 archives:
   - name_template: '{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}'
-dockers:
-  - image_templates:
-    - "public.ecr.aws/opslevel/opslevel-runner:latest"
-    - "public.ecr.aws/opslevel/opslevel-runner:{{ .Tag }}"
-    build_flag_templates:
-    - "--label=org.opencontainers.image.created={{ .Date }}"
-    - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
-    - "--label=org.opencontainers.image.version={{ .Tag }}"
+dockers_v2:
+  - images:
+    - "public.ecr.aws/opslevel/opslevel-runner"
+    tags:
+    - "latest"
+    - "{{ .Tag }}"
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    labels:
+      "org.opencontainers.image.created": "{{ .Date }}"
+      "org.opencontainers.image.revision": "{{ .FullCommit }}"
+      "org.opencontainers.image.version": "{{ .Tag }}"
 brews:
   - name: opslevel-runner
     homepage: "https://www.opslevel.com/"
