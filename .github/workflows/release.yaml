@@ -50,8 +50,10 @@ jobs:
           password: ${{ secrets.ECR_PUBLIC_AWS_SECRET_ACCESS_KEY }}
         env:
           AWS_REGION: us-east-1
-      - name: Cache Docker Layers
-        run: docker pull public.ecr.aws/opslevel/opslevel-runner:v22.07.29 || true
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
       - name: Ensure Changelog
         run: |
           git config user.name "OpsLevel Bots"
