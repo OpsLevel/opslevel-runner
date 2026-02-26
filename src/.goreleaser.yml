@@ -32,6 +32,7 @@ dockers_v2:
     platforms:
     - linux/amd64
     - linux/arm64
+    sbom: false
     labels:
       "org.opencontainers.image.created": "{{ .Date }}"
       "org.opencontainers.image.revision": "{{ .FullCommit }}"
