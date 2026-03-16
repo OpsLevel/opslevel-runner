@@ -10,7 +10,7 @@ require (
 	github.com/getsentry/sentry-go v0.29.1
 	github.com/go-resty/resty/v2 v2.17.1
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/opslevel/opslevel-go/v2026 v2026.2.18
+	github.com/opslevel/opslevel-go/v2026 v2026.3.6
 	github.com/prometheus/client_golang v1.20.5
 	github.com/rocktavious/autopilot/v2023 v2023.12.7
 	github.com/rs/zerolog v1.34.0
