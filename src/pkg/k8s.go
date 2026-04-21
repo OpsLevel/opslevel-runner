@@ -50,8 +50,8 @@ type JobConfig struct {
 	PodName       string
 	ContainerName string
 	Stdin         io.Reader
-	Stdout        *SafeBuffer
-	Stderr        *SafeBuffer
+	Stdout        io.Writer
+	Stderr        io.Writer
 }
 
 type JobRunner struct {
@@ -278,7 +278,7 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 }
 
 // TODO: Remove all usages of "Viper" they should be passed in at JobRunner configuration time
-func (s *JobRunner) Run(ctx context.Context, job opslevel.RunnerJob, stdout, stderr *SafeBuffer) JobOutcome {
+func (s *JobRunner) Run(ctx context.Context, job opslevel.RunnerJob, stdout, stderr io.Writer) JobOutcome {
 	id := string(job.Id)
 	// Once we get off "the old API" method of runner we can circle back around to this
 	// and fix it to generate safe pod names since k8s has limitations.
@@ -344,7 +344,7 @@ func (s *JobRunner) Run(ctx context.Context, job opslevel.RunnerJob, stdout, std
 	runErr := s.Exec(ctx, stdout, stderr, pod, pod.Spec.Containers[0].Name, s.podConfig.Shell, "-e", "-c", strings.Join(commands, ";\n"))
 	if runErr != nil {
 		return JobOutcome{
-			Message: fmt.Sprintf("pod execution failed REASON: %s %s", strings.TrimSuffix(stderr.String(), "\n"), runErr),
+			Message: fmt.Sprintf("pod execution failed REASON: %s", runErr),
 			Outcome: opslevel.RunnerJobOutcomeEnumFailed,
 		}
 	}
@@ -406,7 +406,7 @@ func (s *JobRunner) ExecWithConfig(ctx context.Context, config JobConfig) error 
 	})
 }
 
-func (s *JobRunner) Exec(ctx context.Context, stdout, stderr *SafeBuffer, pod *corev1.Pod, containerName string, cmd ...string) error {
+func (s *JobRunner) Exec(ctx context.Context, stdout, stderr io.Writer, pod *corev1.Pod, containerName string, cmd ...string) error {
 	return s.ExecWithConfig(ctx, JobConfig{
 		Command:       cmd,
 		Namespace:     pod.Namespace,

@@ -38,4 +38,11 @@ func (s *SanitizeLogProcessor) ProcessStderr(line string) string {
 	return s.Process(line)
 }
 
+// SanitizeBoundary lets LogStreamer redact secrets across a force-flush
+// chunk boundary before the prefix is emitted, so a secret straddling the
+// cut is masked in both halves.
+func (s *SanitizeLogProcessor) SanitizeBoundary(line string) string {
+	return s.Process(line)
+}
+
 func (s *SanitizeLogProcessor) Flush(outcome JobOutcome) {}
