@@ -40,6 +40,31 @@ func (s *LogStreamer) AddProcessor(processor LogProcessor) {
 	s.processors = append(s.processors, processor)
 }
 
+type logStream struct {
+	buf *SafeBuffer
+	fn  func(LogProcessor, string) string
+}
+
+func (s *LogStreamer) streams() []logStream {
+	return []logStream{
+		{s.Stderr, LogProcessor.ProcessStderr},
+		{s.Stdout, LogProcessor.ProcessStdout},
+	}
+}
+
+func (s *LogStreamer) processLine(stream logStream) {
+	line, _ := stream.buf.ReadString('\n')
+	if line == "" {
+		return
+	}
+	line = strings.TrimSuffix(line, "\n")
+	for _, processor := range s.processors {
+		line = stream.fn(processor, line)
+	}
+	s.logBuffer.Value = line
+	s.logBuffer = s.logBuffer.Next()
+}
+
 func (s *LogStreamer) GetLogBuffer() []string {
 	output := make([]string, 0)
 	s.logBuffer.Do(func(line any) {
@@ -63,26 +88,9 @@ func (s *LogStreamer) Run(ctx context.Context) {
 			s.logger.Trace().Msg("Shutting down log streamer ...")
 			return
 		case <-ticker.C:
-			for len(s.Stderr.String()) > 0 {
-				line, err := s.Stderr.ReadString('\n')
-				if err == nil {
-					line = strings.TrimSuffix(line, "\n")
-					for _, processor := range s.processors {
-						line = processor.ProcessStderr(line)
-					}
-					s.logBuffer.Value = line
-					s.logBuffer = s.logBuffer.Next()
-				}
-			}
-			for len(s.Stdout.String()) > 0 {
-				line, err := s.Stdout.ReadString('\n')
-				if err == nil {
-					line = strings.TrimSuffix(line, "\n")
-					for _, processor := range s.processors {
-						line = processor.ProcessStdout(line)
-					}
-					s.logBuffer.Value = line
-					s.logBuffer = s.logBuffer.Next()
+			for _, stream := range s.streams() {
+				for strings.Contains(stream.buf.String(), "\n") {
+					s.processLine(stream)
 				}
 			}
 		}
@@ -94,7 +102,7 @@ func (s *LogStreamer) Flush(outcome JobOutcome) {
 	ticker := time.NewTicker(200 * time.Millisecond)
 	defer ticker.Stop()
 	timeout := time.After(30 * time.Second)
-	for len(s.Stderr.String()) > 0 || len(s.Stdout.String()) > 0 {
+	for strings.Contains(s.Stderr.String(), "\n") || strings.Contains(s.Stdout.String(), "\n") {
 		select {
 		case <-ticker.C:
 			// Continue waiting
@@ -107,6 +115,10 @@ done:
 	s.logger.Trace().Msg("Finished log streamer flush ...")
 	s.quit <- true
 	time.Sleep(200 * time.Millisecond) // Allow 'Run' goroutine to quit
+	// Drain any partial line that never received a terminating newline.
+	for _, stream := range s.streams() {
+		s.processLine(stream)
+	}
 	s.logger.Trace().Msg("Flushing log processors ...")
 	for i := len(s.processors) - 1; i >= 0; i-- {
 		s.processors[i].Flush(outcome)

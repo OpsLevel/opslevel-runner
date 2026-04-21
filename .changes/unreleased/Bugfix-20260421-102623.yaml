@@ -1,0 +1,3 @@
+kind: Bugfix
+body: Fix handling of partial log lines.
+time: 2026-04-21T10:26:23.397872-04:00
