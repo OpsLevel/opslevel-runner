@@ -6,6 +6,7 @@ import (
 	"context"
 	"io"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/rs/zerolog"
 )
@@ -118,6 +119,12 @@ func (s *LogStreamer) Run(ctx context.Context) {
 // emitting any trailing no-newline partial line first.
 func (s *LogStreamer) readLoop(r io.Reader, processFn func(LogProcessor, string) string) {
 	defer s.wg.Done()
+	defer func() {
+		if rec := recover(); rec != nil {
+			s.logger.Error().Interface("panic", rec).Msg("log processor panicked; draining reader")
+			_, _ = io.Copy(io.Discard, r)
+		}
+	}()
 	buf := make([]byte, 0, maxLineBytes+readChunk)
 	readBuf := make([]byte, readChunk)
 	for {
@@ -160,6 +167,9 @@ func (s *LogStreamer) drain(buf []byte, processFn func(LogProcessor, string) str
 			return append(buf[:0], full...)
 		}
 		cut := len(full) - boundaryOverlap
+		for cut > 0 && !utf8.RuneStart(full[cut]) {
+			cut--
+		}
 		s.emit(full[:cut], processFn)
 		return append(buf[:0], full[cut:]...)
 	}
