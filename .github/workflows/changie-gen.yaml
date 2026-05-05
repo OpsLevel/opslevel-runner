@@ -39,11 +39,14 @@ jobs:
           echo "No changelog exists for this PR, creating a new one"
         fi
 
-    - name: Install changie
+    - name: Set up Go
       if: >-
         github.event.workflow_run.conclusion == 'success' &&
         steps.changelog_check.outputs.exists == 'false'
-      run: go install github.com/miniscruff/changie@v1.23.0
+      uses: actions/setup-go@v6
+      with:
+        go-version-file: 'src/go.mod'
+        cache-dependency-path: src/go.sum
 
     - name: Create changie log
       if: >-
@@ -51,7 +54,7 @@ jobs:
         steps.changelog_check.outputs.exists == 'false'
       env:
         CHANGIE_BODY: ${{ github.event.workflow_run.display_title }}
-      run: changie new --kind Dependency --body "$CHANGIE_BODY"
+      run: $(cd src && go tool -n changie) new --kind Dependency --body "$CHANGIE_BODY"
 
     - name: Commit & Push changes
       if: >-
