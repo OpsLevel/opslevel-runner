@@ -39,14 +39,19 @@ jobs:
           echo "No changelog exists for this PR, creating a new one"
         fi
 
+    - name: Install changie
+      if: >-
+        github.event.workflow_run.conclusion == 'success' &&
+        steps.changelog_check.outputs.exists == 'false'
+      run: go install github.com/miniscruff/changie@v1.23.0
+
     - name: Create changie log
       if: >-
         github.event.workflow_run.conclusion == 'success' &&
         steps.changelog_check.outputs.exists == 'false'
-      uses: miniscruff/changie-action@v2
-      with:
-        version: v1.23.0
-        args: new --kind Dependency --body "${{ github.event.workflow_run.display_title }}"
+      env:
+        CHANGIE_BODY: ${{ github.event.workflow_run.display_title }}
+      run: changie new --kind Dependency --body "$CHANGIE_BODY"
 
     - name: Commit & Push changes
       if: >-
