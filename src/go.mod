@@ -79,6 +79,7 @@ require (
 	github.com/huandu/xstrings v1.5.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/invopop/jsonschema v0.13.0 // indirect
+	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/klauspost/compress v1.18.5 // indirect
@@ -89,6 +90,7 @@ require (
 	github.com/mattn/go-isatty v0.0.21 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
+	github.com/mattn/goreman v0.3.17 // indirect
 	github.com/miniscruff/changie v1.24.0 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
@@ -148,6 +150,7 @@ require (
 // replace github.com/opslevel/opslevel-go/v2026 => /Users/jason/workspace/opslevel-go
 
 tool (
+	github.com/mattn/goreman
 	github.com/miniscruff/changie
 	mvdan.cc/gofumpt
 )
