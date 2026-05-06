@@ -86,9 +86,20 @@ tasks:
       - install-redis
     status:
       - test -n "command -v faktory"
+    vars:
+      GOARCH:
+        sh: go env GOARCH
+      EXPECTED_SHA256:
+        sh: |
+          case $(go env GOARCH) in
+            amd64) echo "c20fbf67cd54f2313a4180b0506ac96fbb66bfc8b9a39917f27246b41087f300" ;;
+            arm64) echo "edfaaa5242ec7702ad0eb14c6f388b25a77d1fb01d9ec9845332df50bead64f4" ;;
+            *) echo "unsupported arch: $(go env GOARCH)" >&2; exit 1 ;;
+          esac
     cmds:
       - mkdir -p ./faktory
-      - curl -sL https://github.com/contribsys/faktory/releases/download/v1.8.0/faktory-ent_1.8.0.macos.$(go env GOARCH).tbz -o ./faktory/faktory-ent.osx.tbz
+      - curl -sL https://github.com/contribsys/faktory/releases/download/v1.8.0/faktory-ent_1.8.0.macos.{{.GOARCH}}.tbz -o ./faktory/faktory-ent.osx.tbz
+      - echo "{{.EXPECTED_SHA256}}  ./faktory/faktory-ent.osx.tbz" | shasum -a 256 -c -
       - tar xjf ./faktory/faktory-ent.osx.tbz -C ./faktory
       - mv ./faktory/faktory /usr/local/bin
       - chmod +x /usr/local/bin/faktory
