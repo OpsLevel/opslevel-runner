@@ -75,6 +75,7 @@ args:
     commands:
       - "echo Coding-agent proxy test pod up. Job ID: ${JOB_ID}"
       - "echo Squid sidecar reachable at localhost:3128"
+      - "sleep 1m"
     variables:
       - key: "PROXY_ALLOWED_DOMAINS"
         value: "example.com"
