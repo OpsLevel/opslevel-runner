@@ -23,8 +23,14 @@ src/opslevel-runner
 src/go.work**
 **coverage.txt
 
+# Host build artifacts (local kind dev)
+dist/
+
 # ignore any user-created yaml files that may have been used for tophatting.
 src/*.yaml
 
 # Git worktrees
 .worktrees/
+
+# Local environment overrides (e.g. KUBECONFIG env var)
+.env.local

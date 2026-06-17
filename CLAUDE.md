@@ -53,7 +53,7 @@ Run an end-to-end test with Faktory and a local Kubernetes cluster:
 task start-faktory
 
 # Terminal 2: Enqueue test jobs (requires Faktory running)
-cd src && go run scripts/enqueue-test-jobs.go 50
+go run -C src ../tests/enqueue-test-jobs.go 50
 
 # Monitor jobs at http://localhost:7420
 ```

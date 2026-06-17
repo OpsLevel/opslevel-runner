@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+set -eu
+SCRIPT_DIR="${BASH_SOURCE[0]%/*}"
+
+# source for KUBECONFIG and k8s context to be set
+source "$SCRIPT_DIR/setup-kind.sh" opslevel-runner
+exec go run -C "$SCRIPT_DIR/../src" . run --mode=faktory --queues=runner --job-pod-max-wait=300 --runner-pod-namespace=default

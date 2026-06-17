@@ -1,10 +1,16 @@
 # https://taskfile.dev/
 
-version: '3'
+version: "3"
+
+set: [errexit, pipefail]
 
 env:
-  OPSLEVEL_GO_PKG: "github.com/opslevel/opslevel-go/v2024"
+  OPSLEVEL_GO_PKG: "github.com/opslevel/opslevel-go/v2026"
   SRC_DIR: "{{.TASKFILE_DIR}}/src"
+  HOMEBREW_NO_AUTO_UPDATE: 1
+
+vars:
+  FAKTORY_VERSION: "1.9.3"
 
 tasks:
   ci:
@@ -34,6 +40,7 @@ tasks:
   setup:
     desc: Setup workspace for local development
     cmds:
+      - task: install-faktory
       - task: workspace
 
   test:
@@ -56,51 +63,107 @@ tasks:
     cmds:
       - cmd: echo "Setting up opslevel-go workspace..."
         silent: true
+      - git submodule update --init --recursive
       - go work init || exit 0
       - go work use . submodules/opslevel-go
       - cmd: echo "opslevel-go workspace ready!"
         silent: true
 
-  start-faktory:
-    desc: Start Faktory and opslevel-runner in faktory mode
-    dir: "{{.SRC_DIR}}"
+  run:
+    desc: Start Faktory + runner + coding-agent workers via goreman; (re)build/load helper image on change.
     deps:
-      - install-faktory
+      - build-helper-image
+      - run-watcher
+    dir: "{{.SRC_DIR}}"
     cmds:
-      - go tool goreman start
+      - |
+        go tool goreman start
+
+  run-watcher:
+    desc: "Restart both host workers when any .go file changes. Run under goreman (Procfile watcher)."
+    dir: "{{.SRC_DIR}}"
+    watch: true
+    sources:
+      - "**/*.go"
+    cmds:
+      - go tool goreman run restart runner coding-agent || true
+
+  build-helper-image:
+    desc: Build the runner helper image and load it into kind (loads on rebuild or when absent in kind).
+    dir: "{{.SRC_DIR}}"
+    watch: true
+    sources:
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+      - "../Dockerfile"
+    deps:
+      - task: setup-kind
+        vars: { KIND_CLUSTER: "{{.KIND_CLUSTER}}" }
+    vars:
+      KIND_CLUSTER: '{{default "opslevel-runner" .KIND_CLUSTER}}'
+      HELPER_IMAGE: '{{default "opslevel-runner:local" .HELPER_IMAGE}}'
+    cmds:
+      - HELPER_IMAGE={{.HELPER_IMAGE}} {{.TASKFILE_DIR}}/bin/build-helper-image.sh {{.KIND_CLUSTER}}
+
+  stop-kind:
+    desc: Clean orphaned job pods and stop kind cluster
+    vars:
+      KIND_CLUSTER: '{{default "opslevel-runner" .KIND_CLUSTER}}'
+    cmds:
+      - "{{.TASKFILE_DIR}}/bin/stop-kind.sh {{.KIND_CLUSTER}}"
 
   # internal (not directly called) tasks
 
-  install-redis:
-    desc: install "redis-server"
+  setup-kind:
     internal: true
+    vars:
+      KIND_CLUSTER: '{{default "opslevel-runner" .KIND_CLUSTER}}'
+    cmds:
+      # --wait: block until the cluster exists for tasks requiring
+      # a cluster to target; e.g. build-helper-image's `kind load`
+      - "{{.TASKFILE_DIR}}/bin/setup-kind.sh --wait {{.KIND_CLUSTER}}"
+
+  install-redis:
+    desc: Install redis-server
     status:
-      - test -n "command -v redis-server"
+      - command -v redis-server
+    cmds:
+      - task: install-redis-{{OS}}
+
+  install-redis-darwin:
+    internal: true
     cmds:
       - brew install redis
 
-  install-faktory:
-    desc: install "faktory"
+  install-redis-linux:
     internal: true
+    cmds:
+      - sudo apt-get install -y redis-server
+
+  install-faktory:
+    desc: Install Faktory from GitHub releases
     deps:
       - install-redis
-    status:
-      - test -n "command -v faktory"
-    vars:
-      GOARCH:
-        sh: go env GOARCH
-      EXPECTED_SHA256:
-        sh: |
-          case $(go env GOARCH) in
-            amd64) echo "c20fbf67cd54f2313a4180b0506ac96fbb66bfc8b9a39917f27246b41087f300" ;;
-            arm64) echo "edfaaa5242ec7702ad0eb14c6f388b25a77d1fb01d9ec9845332df50bead64f4" ;;
-            *) echo "unsupported arch: $(go env GOARCH)" >&2; exit 1 ;;
-          esac
     cmds:
-      - mkdir -p ./faktory
-      - curl -sL https://github.com/contribsys/faktory/releases/download/v1.8.0/faktory-ent_1.8.0.macos.{{.GOARCH}}.tbz -o ./faktory/faktory-ent.osx.tbz
-      - echo "{{.EXPECTED_SHA256}}  ./faktory/faktory-ent.osx.tbz" | shasum -a 256 -c -
-      - tar xjf ./faktory/faktory-ent.osx.tbz -C ./faktory
-      - mv ./faktory/faktory /usr/local/bin
-      - chmod +x /usr/local/bin/faktory
-      - rm -rf ./faktory
+      - task: install-faktory-{{OS}}
+
+  install-faktory-darwin:
+    internal: true
+    vars:
+      ARCH:
+        sh: uname -m | sed 's/x86_64/amd64/'
+      ASSET_PATTERN: "faktory_{{.FAKTORY_VERSION}}.macos.{{.ARCH}}.tbz"
+    status:
+      - test -x /usr/local/bin/faktory && /usr/local/bin/faktory -v | grep -q "{{.FAKTORY_VERSION}}"
+    cmds:
+      - echo "Installing Faktory {{.FAKTORY_VERSION}} for macOS ({{.ARCH}})..."
+      - |
+        DOWNLOAD_URL=$(curl --silent "https://api.github.com/repos/contribsys/faktory/releases/tags/v{{.FAKTORY_VERSION}}" \
+          | jq --raw-output --arg ASSET_PATTERN "{{.ASSET_PATTERN}}" \
+            '.assets[] | select(.name == $ASSET_PATTERN) | .browser_download_url')
+        curl -fsSL "$DOWNLOAD_URL" -o /tmp/{{.ASSET_PATTERN}}
+      - tar -xjf /tmp/{{.ASSET_PATTERN}} -C /tmp
+      - sudo install -m 0755 /tmp/faktory /usr/local/bin/faktory
+      - rm -f /tmp/{{.ASSET_PATTERN}} /tmp/faktory
+      - echo "Faktory {{.FAKTORY_VERSION}} installed to /usr/local/bin/faktory"

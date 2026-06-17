@@ -1,2 +1,3 @@
 faktory: faktory
-runner: go run main.go run --mode=faktory --queues=runner --job-pod-max-wait=300
+runner: ../bin/opslevel-runner-runner
+coding-agent: ../bin/opslevel-runner-coding-agent
