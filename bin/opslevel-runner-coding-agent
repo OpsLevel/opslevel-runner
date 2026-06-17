@@ -5,4 +5,4 @@ SCRIPT_DIR="${BASH_SOURCE[0]%/*}"
 
 # source for KUBECONFIG and k8s context to be set
 source "$SCRIPT_DIR/setup-kind.sh" opslevel-runner
-exec go run -C "$SCRIPT_DIR/../src" . --log-level TRACE --job-pod-helper-image=localhost/opslevel-runner:local run --mode=faktory --queues=coding-agent --queue=coding-agent --job-pod-max-wait=300 --runner-pod-namespace=default --job-agent-mode=true
+exec go run -C "$SCRIPT_DIR/../src" . --log-level TRACE --job-pod-helper-image=localhost/opslevel-runner:local run --mode=faktory --queues=coding-agent --queue=coding-agent --job-pod-max-wait=300 --runner-pod-namespace=default --job-agent-mode=true --metrics-port=10355

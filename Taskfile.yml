@@ -86,7 +86,14 @@ tasks:
     sources:
       - "**/*.go"
     cmds:
-      - go tool goreman run restart runner coding-agent || true
+      - |
+        elapsed=0
+        until go tool goreman run list >/dev/null 2>&1; do
+          sleep 1
+          elapsed=$((elapsed + 1))
+          [ "$elapsed" -ge 10 ] && break
+        done
+        go tool goreman run restart runner coding-agent
 
   build-helper-image:
     desc: Build the runner helper image and load it into kind (loads on rebuild or when absent in kind).
