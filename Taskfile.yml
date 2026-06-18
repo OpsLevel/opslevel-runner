@@ -11,6 +11,8 @@ env:
 
 vars:
   FAKTORY_VERSION: "1.9.3"
+  HELPER_IMAGE: "localhost/opslevel-runner:local"
+  KIND_CLUSTER: "opslevel-runner"
 
 tasks:
   ci:
@@ -70,53 +72,23 @@ tasks:
         silent: true
 
   run:
-    desc: Start Faktory + runner + coding-agent workers via goreman; (re)build/load helper image on change.
+    desc: Start dev environment (Faktory + workers with hot-reload via watchexec).
     deps:
-      - build-helper-image
-      - run-watcher
+      - task: setup-kind
     dir: "{{.SRC_DIR}}"
     cmds:
-      - |
-        go tool goreman start
-
-  run-watcher:
-    desc: "Restart both host workers when any .go file changes. Run under goreman (Procfile watcher)."
-    dir: "{{.SRC_DIR}}"
-    watch: true
-    sources:
-      - "**/*.go"
-    cmds:
-      - |
-        elapsed=0
-        until go tool goreman run list >/dev/null 2>&1; do
-          sleep 1
-          elapsed=$((elapsed + 1))
-          [ "$elapsed" -ge 10 ] && exit 0
-        done
-        go tool goreman run restart runner coding-agent
+      - go tool goreman start
 
   build-helper-image:
     desc: Build the runner helper image and load it into kind (loads on rebuild or when absent in kind).
     dir: "{{.SRC_DIR}}"
-    watch: true
-    sources:
-      - "**/*.go"
-      - "go.mod"
-      - "go.sum"
-      - "../Dockerfile"
     deps:
       - task: setup-kind
-        vars: { KIND_CLUSTER: "{{.KIND_CLUSTER}}" }
-    vars:
-      KIND_CLUSTER: '{{default "opslevel-runner" .KIND_CLUSTER}}'
-      HELPER_IMAGE: '{{default "opslevel-runner:local" .HELPER_IMAGE}}'
     cmds:
       - HELPER_IMAGE={{.HELPER_IMAGE}} {{.TASKFILE_DIR}}/bin/build-helper-image.sh {{.KIND_CLUSTER}}
 
   stop-kind:
     desc: Clean orphaned job pods and stop kind cluster
-    vars:
-      KIND_CLUSTER: '{{default "opslevel-runner" .KIND_CLUSTER}}'
     cmds:
       - "{{.TASKFILE_DIR}}/bin/stop-kind.sh {{.KIND_CLUSTER}}"
 
@@ -124,26 +96,23 @@ tasks:
 
   setup-kind:
     internal: true
-    vars:
-      KIND_CLUSTER: '{{default "opslevel-runner" .KIND_CLUSTER}}'
     cmds:
-      # --wait: block until the cluster exists for tasks requiring
-      # a cluster to target; e.g. build-helper-image's `kind load`
       - "{{.TASKFILE_DIR}}/bin/setup-kind.sh --wait {{.KIND_CLUSTER}}"
 
-  install-redis:
-    desc: Install redis-server
+  install-deps:
+    desc: Install development dependencies (redis, watchexec)
     status:
       - command -v redis-server
+      - command -v watchexec
     cmds:
-      - task: install-redis-{{OS}}
+      - task: install-deps-{{OS}}
 
-  install-redis-darwin:
+  install-deps-darwin:
     internal: true
     cmds:
-      - brew install redis
+      - brew install redis watchexec
 
-  install-redis-linux:
+  install-deps-linux:
     internal: true
     cmds:
       - sudo apt-get install -y redis-server
@@ -151,7 +120,7 @@ tasks:
   install-faktory:
     desc: Install Faktory from GitHub releases
     deps:
-      - install-redis
+      - install-deps
     cmds:
       - task: install-faktory-{{OS}}
 
