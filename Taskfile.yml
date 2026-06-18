@@ -91,7 +91,7 @@ tasks:
         until go tool goreman run list >/dev/null 2>&1; do
           sleep 1
           elapsed=$((elapsed + 1))
-          [ "$elapsed" -ge 10 ] && break
+          [ "$elapsed" -ge 10 ] && exit 0
         done
         go tool goreman run restart runner coding-agent
 
