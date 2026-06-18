@@ -110,7 +110,7 @@ tasks:
   install-deps-darwin:
     internal: true
     cmds:
-      - brew install redis watchexec
+      - brew install redis watchexec kind
 
   install-deps-linux:
     internal: true
