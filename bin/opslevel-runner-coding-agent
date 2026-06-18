@@ -14,4 +14,6 @@ exec watchexec --watch "$SCRIPT_DIR/../src" --exts go,mod,sum --restart \
     --job-pod-max-wait=900 \
     --runner-pod-namespace=default \
     --job-agent-mode=true --metrics-port=10355 \
-    --job-pod-helper-image=localhost/opslevel-runner:local
+    --job-pod-helper-image=localhost/opslevel-runner:local \
+    --job-pod-requests-cpu="${OPSLEVEL_JOB_POD_REQUESTS_CPU:-50}" \
+    --job-pod-requests-memory="${OPSLEVEL_JOB_POD_REQUESTS_MEMORY:-32}"

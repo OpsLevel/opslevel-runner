@@ -12,7 +12,7 @@ set -e
 SCRIPT_DIR="${BASH_SOURCE[0]%/*}/../bin"
 source "$SCRIPT_DIR/kind-env.sh"
 
-NUM_JOBS=${1:-10}
+NUM_JOBS=${1:-3}
 src="${BASH_SOURCE[0]%/*}/../src"
 
 echo "Enqueuing $NUM_JOBS test jobs to Faktory..."
