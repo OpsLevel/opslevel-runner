@@ -58,6 +58,8 @@ exec "$BINARY" \
   --log-level "${OPSLEVEL_LOG_LEVEL:-TRACE}" \
   --log-format "${OPSLEVEL_LOG_FORMAT:-TEXT}" \
   --job-pod-helper-image "$HELPER_IMAGE" \
+  --job-pod-requests-cpu "${OPSLEVEL_JOB_POD_REQUESTS_CPU:-50}" \
+  --job-pod-requests-memory "${OPSLEVEL_JOB_POD_REQUESTS_MEMORY:-32}" \
   "${EXTRA_FLAGS[@]}" \
   run \
   --mode faktory \
