@@ -140,7 +140,6 @@ processes defined in `src/Procfile`:
 |---------|-------------|
 | `faktory` | Starts the Faktory work server (job queue) |
 | `runner` | hot-reloads `opslevel-runner run --mode=faktory --queues=runner` through `watchexec` |
-| `coding-agent` | hot-reloads `opslevel-runner run --mode=faktory --queues=coding-agent --job-agent-mode=true` through `watchexec` |
 | `image-builder` | Watches Go sources and `Dockerfile` with `watchexec`; rebuilds the helper container image and reloads it into kind on change |
 
 > Note: `--mode faktory` does have `opslevel-runner` poll Faktory for runner
