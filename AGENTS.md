@@ -38,3 +38,27 @@ bd sync               # Sync with git
 - NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds
 
+## Container / kind tooling
+
+Prefer podman, fall back to docker. Under podman, kind needs the experimental
+provider env var. Keep snippets pure shell (no Taskfile vars) so they can be
+pasted into a terminal as-is:
+
+```bash
+if command -v podman &>/dev/null; then
+  export KIND_EXPERIMENTAL_PROVIDER=podman
+  cmd=podman
+else
+  cmd=docker
+fi
+```
+
+Use `"$cmd"` for build/save/exec calls. Helper-image build+load logic lives in
+`bin/build-helper-image.sh` (loads on rebuild or when absent in kind).
+
+`crictl` is not present in kind nodes; query node images with:
+
+```bash
+"$cmd" exec <cluster>-control-plane ctr -n k8s.io images ls -q
+```
+

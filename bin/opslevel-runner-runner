@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+set -eu
+SCRIPT_DIR="${BASH_SOURCE[0]%/*}"
+
+# source for KUBECONFIG and k8s context to be set
+source "$SCRIPT_DIR/setup-kind.sh" opslevel-runner
+
+exec watchexec --watch "$SCRIPT_DIR/../src" --exts go,mod,sum --restart \
+  -- go run -C "$SCRIPT_DIR/../src" . run \
+    --mode=faktory \
+    --queues=runner \
+    --job-pod-max-wait=900 \
+    --runner-pod-namespace=default \
+    --job-pod-helper-image=localhost/opslevel-runner:dev \
+    --job-pod-requests-cpu="${OPSLEVEL_JOB_POD_REQUESTS_CPU:-50}" \
+    --job-pod-requests-memory="${OPSLEVEL_JOB_POD_REQUESTS_MEMORY:-32}"

@@ -1,2 +1,3 @@
 faktory: faktory
-runner: go run main.go run --mode=faktory --queues=runner --job-pod-max-wait=300
+runner: ../bin/opslevel-runner-runner
+image-builder: watchexec --watch cmd/enqueue.go --watch cmd/root.go --watch main.go --watch go.mod --watch go.sum --watch ../Dockerfile -- HELPER_IMAGE=localhost/opslevel-runner:dev ../bin/build-helper-image.sh opslevel-runner

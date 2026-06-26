@@ -2,15 +2,18 @@
 #
 # Enqueue N test jobs to Faktory for end-to-end testing
 #
-# Usage: ./scripts/enqueue-test-jobs.sh [NUM_JOBS]
+# Usage: ./tests/enqueue-test-jobs.sh [NUM_JOBS]
 #        NUM_JOBS defaults to 10
 #
 
 set -e
 
-NUM_JOBS=${1:-10}
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SRC_DIR="$(dirname "$SCRIPT_DIR")"
+# load KUBECONFIG (.env.local) + set $cmd / KIND_EXPERIMENTAL_PROVIDER for k8s context
+SCRIPT_DIR="${BASH_SOURCE[0]%/*}/../bin"
+source "$SCRIPT_DIR/kind-env.sh"
+
+NUM_JOBS=${1:-3}
+src="${BASH_SOURCE[0]%/*}/../src"
 
 echo "Enqueuing $NUM_JOBS test jobs to Faktory..."
 
@@ -30,7 +33,7 @@ args:
     commands:
       - "echo Hello from job ${i}"
       - "echo Job ID: ${JOB_ID}"
-      - "sleep 2"
+      - "sleep 36"
       - "echo Job ${i} complete"
     variables: []
     files:
@@ -41,7 +44,7 @@ custom:
 ENDJOB
 
     # Enqueue the job
-    cd "$SRC_DIR" && go run main.go enqueue -f "$JOB_FILE"
+    go run -C "$src" . --log-level DEBUG enqueue -f "$JOB_FILE"
 
     # Clean up temp file
     rm -f "$JOB_FILE"

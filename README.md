@@ -29,7 +29,6 @@ OpsLevel Runner is the Kubernetes based job processor for [OpsLevel](https://www
 | opslevel_runner_jobs_processing | `gauge`     | The current number of active jobs being processed.            |
 | opslevel_runner_jobs_started    | `counter`   | The count of jobs that started processing.                    |
 
-
 ### Commands
 
 Testing a job
@@ -69,9 +68,9 @@ Running
 
 ```sh
 # Production
-OPSLEVEL_API_TOKEN=XXXXX go run main.go run 
+OPSLEVEL_API_TOKEN=XXXXX go run main.go run
 # Staging
-OPSLEVEL_API_TOKEN=XXXXX go run main.go run --api-url=https://api.opslevel-staging.com/graphql --app-url=https://app.opslevel-staging.com  
+OPSLEVEL_API_TOKEN=XXXXX go run main.go run --api-url=https://api.opslevel-staging.com/graphql --app-url=https://app.opslevel-staging.com
 ```
 
 ## Running
@@ -112,4 +111,75 @@ Then run `go build` in `src` to build in the local directory, you can also use `
 ```
 cd src
 go build
+```
+
+## Local Development
+
+The dev environment uses [kind](https://kind.sigs.k8s.io/) (Kubernetes in Docker/Podman), [Faktory](https://github.com/contribsys/faktory) as job queue, and [Task](https://taskfile.dev/) as task runner.
+
+### Prerequisites
+
+- Go (`brew install go`)
+- [Task](https://taskfile.dev/) (`brew install go-task`)
+- Docker or Podman
+
+### Quick Start
+
+```sh
+task setup   # install Faktory + workspace deps
+task run     # start Faktory + workers (creates kind cluster automatically)
+```
+
+### What `task run` Does
+
+The `run` task instantiates the kind cluster if it doesn't exist then starts
+[goreman](https://github.com/mattn/goreman) which supervises 4 concurrent
+processes defined in `src/Procfile`:
+
+| Process | Description |
+|---------|-------------|
+| `faktory` | Starts the Faktory work server (job queue) |
+| `runner` | hot-reloads `opslevel-runner run --mode=faktory --queues=runner` through `watchexec` |
+| `image-builder` | Watches Go sources and `Dockerfile` with `watchexec`; rebuilds the helper container image and reloads it into kind on change |
+
+> Note: `--mode faktory` does have `opslevel-runner` poll Faktory for runner
+> jobs and launches them as pods in the kind cluster
+
+### Kubernetes Configuration
+
+Scripts source `.env.local` (gitignored) to set local environment overrides
+before creating or connecting to the kind cluster. e.g.: to reuse a k8s cluster
+from a specific KUBECONFIG file
+
+```sh
+# .env.local
+# Point at a dedicated kubeconfig to keep localdev contexts isolated.
+export KUBECONFIG=${HOME}/.kube/opslevel.localdev.yaml
+```
+
+- `bin/kind-env.sh` loads this file, falling back to `~/.kube/config` when `KUBECONFIG` is unset.
+- The kind cluster name defaults to `opslevel-runner`.
+
+### Container Runtime
+
+Podman is preferred; Docker is used as fallback. Handled in `bin/kind-env.sh`.
+
+### Other Noteworthy Tasks
+
+#### Helper Image
+
+Build and load the runner helper image into kind:
+
+```sh
+task build-helper-image
+```
+
+This cross-compiles the Go binary for linux, builds the container image from
+`Dockerfile`, and loads it into the kind cluster. The image is only rebuilt
+when source checksums change.
+
+#### Stopping Kind Cluster
+
+```sh
+task stop-kind   # clean orphaned job pods and stop the cluster
 ```
