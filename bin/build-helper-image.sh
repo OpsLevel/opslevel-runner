@@ -23,13 +23,7 @@ image_in_kind() {
 
 checksum_sources() {
   { cd "$SCRIPT_DIR/../src" && \
-    find . \
-      \( -name '*.go' -o -name 'go.mod' -o -name 'go.sum' \) \
-      -type f \
-      -print0 |
-    LC_ALL=C sort -z |
-    xargs -0 shasum -a 256
-    shasum -a 256 "$SCRIPT_DIR/../Dockerfile"
+    shasum -a 256 cmd/enqueue.go cmd/root.go main.go go.mod go.sum ../Dockerfile
   } | shasum -a 256 | cut -d' ' -f1
 }
 
