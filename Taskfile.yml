@@ -11,7 +11,7 @@ env:
 
 vars:
   FAKTORY_VERSION: "1.9.3"
-  HELPER_IMAGE: "localhost/opslevel-runner:local"
+  HELPER_IMAGE: "localhost/opslevel-runner:dev"
   KIND_CLUSTER: "opslevel-runner"
 
 tasks:

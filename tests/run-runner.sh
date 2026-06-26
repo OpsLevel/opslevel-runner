@@ -14,7 +14,7 @@
 #                                     When set to "coding-agent", also enables
 #                                     --job-agent-mode=true and the helper image override.
 #                                     Default: empty (no sidecar).
-#   OPSLEVEL_JOB_POD_HELPER_IMAGE   - default localhost/opslevel-runner:local
+#   OPSLEVEL_JOB_POD_HELPER_IMAGE   - default localhost/opslevel-runner:dev
 #   FAKTORY_URL                     - default tcp://localhost:7419
 #
 # Examples:
@@ -51,7 +51,7 @@ if [ -n "${OPSLEVEL_QUEUE:-}" ]; then
   fi
 fi
 
-HELPER_IMAGE="${OPSLEVEL_JOB_POD_HELPER_IMAGE:-localhost/opslevel-runner:local}"
+HELPER_IMAGE="${OPSLEVEL_JOB_POD_HELPER_IMAGE:-localhost/opslevel-runner:dev}"
 
 echo "Starting runner (mode=faktory queues=$FAKTORY_QUEUES queue=${OPSLEVEL_QUEUE:-<none>}) ..."
 exec "$BINARY" \

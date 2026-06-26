@@ -6,7 +6,7 @@
 set -eu
 
 CLUSTER_NAME="${1:-opslevel-runner}"
-HELPER_IMAGE="${HELPER_IMAGE:-localhost/opslevel-runner:local}"
+HELPER_IMAGE="${HELPER_IMAGE:-localhost/opslevel-runner:dev}"
 
 SCRIPT_DIR="${BASH_SOURCE[0]%/*}"
 source "$SCRIPT_DIR/kind-env.sh"
