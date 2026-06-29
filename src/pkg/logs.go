@@ -24,11 +24,15 @@ type LogStreamer struct {
 	logBuffer  *ring.Ring
 }
 
-func NewLogStreamer(logger zerolog.Logger, processors ...LogProcessor) LogStreamer {
+// NewLogStreamer builds a streamer whose stdout/stderr buffers are each capped
+// at bufferMaxBytes. A bufferMaxBytes <= 0 leaves the buffers unbounded (used by
+// tests and local `test` runs). Bytes dropped once a buffer is full are counted
+// in the MetricLogBytesDropped metric.
+func NewLogStreamer(logger zerolog.Logger, bufferMaxBytes int, processors ...LogProcessor) LogStreamer {
 	quit := make(chan bool)
 	return LogStreamer{
-		Stdout:     &SafeBuffer{},
-		Stderr:     &SafeBuffer{},
+		Stdout:     NewSafeBuffer(bufferMaxBytes),
+		Stderr:     NewSafeBuffer(bufferMaxBytes),
 		processors: processors,
 		logger:     logger,
 		quit:       quit,
@@ -65,6 +69,15 @@ func (s *LogStreamer) processLine(stream logStream) {
 	s.logBuffer = s.logBuffer.Next()
 }
 
+// recordDroppedBytes folds any bytes a capped buffer had to drop into the
+// dropped-bytes metric so log loss is observable rather than silent.
+func (s *LogStreamer) recordDroppedBytes() {
+	dropped := s.Stdout.DroppedBytes() + s.Stderr.DroppedBytes()
+	if dropped > 0 && MetricLogBytesDropped != nil {
+		MetricLogBytesDropped.Add(float64(dropped))
+	}
+}
+
 func (s *LogStreamer) GetLogBuffer() []string {
 	output := make([]string, 0)
 	s.logBuffer.Do(func(line any) {
@@ -93,6 +106,7 @@ func (s *LogStreamer) Run(ctx context.Context) {
 					s.processLine(stream)
 				}
 			}
+			s.recordDroppedBytes()
 		}
 	}
 }
@@ -119,6 +133,7 @@ done:
 	for _, stream := range s.streams() {
 		s.processLine(stream)
 	}
+	s.recordDroppedBytes()
 	s.logger.Trace().Msg("Flushing log processors ...")
 	for i := len(s.processors) - 1; i >= 0; i-- {
 		s.processors[i].Flush(outcome)

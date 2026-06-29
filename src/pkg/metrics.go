@@ -20,6 +20,7 @@ var (
 	MetricJobsProcessing     prometheus.Gauge
 	MetricEnqueueFailed      prometheus.Counter
 	MetricEnqueueBatchFailed prometheus.Counter
+	MetricLogBytesDropped    prometheus.Counter
 )
 
 func initMetrics(id string) {
@@ -59,6 +60,12 @@ func initMetrics(id string) {
 		Namespace:   metricNamespace,
 		Name:        "jobs_enqueue_batch_failed",
 		Help:        "The count of jobs that failed to enqueue to faktory for a batch.",
+		ConstLabels: prometheus.Labels{"runner": id},
+	})
+	MetricLogBytesDropped = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace:   metricNamespace,
+		Name:        "log_bytes_dropped",
+		Help:        "The count of pod log bytes dropped because a per-stream buffer hit its size cap.",
 		ConstLabels: prometheus.Labels{"runner": id},
 	})
 }
