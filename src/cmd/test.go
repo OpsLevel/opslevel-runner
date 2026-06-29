@@ -40,6 +40,7 @@ func doTest(cmd *cobra.Command, args []string) error {
 	}
 	streamer := pkg.NewLogStreamer(
 		log.Logger,
+		0, // unbounded buffers for local testing
 		pkg.NewSetOutcomeVarLogProcessor(nil, log.Logger, "1", "1", "1"),
 		pkg.NewSanitizeLogProcessor(job.Variables),
 		pkg.NewLoggerLogProcessor(log.Logger),

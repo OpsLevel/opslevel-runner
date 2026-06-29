@@ -49,7 +49,7 @@ func init() {
 	rootCmd.PersistentFlags().String("job-pod-shell", "/bin/sh", "The job pod shell to use for commands run inside the pod.")
 	rootCmd.PersistentFlags().String("job-pod-workdir", "/jobs", "The job pod working directory.")
 	rootCmd.PersistentFlags().Int("job-pod-log-max-interval", 30, "The max amount of time between when pod logs are shipped to OpsLevel. Works in tandem with 'job-pod-log-max-size'")
-	rootCmd.PersistentFlags().Int("job-pod-log-max-size", 1000000, "The max amount in bytes to buffer before pod logs are shipped to OpsLevel. Works in tandem with 'job-pod-log-max-interval'")
+	rootCmd.PersistentFlags().Int("job-pod-log-max-size", 262144, "The max bytes of pod logs buffered before a batch is shipped to OpsLevel. Works in tandem with 'job-pod-log-max-interval'. Also the dominant per-job memory term: peak runner memory is roughly 'job-concurrency' * 6 * this value, so lower it when running high concurrency.")
 	rootCmd.PersistentFlags().Bool("job-agent-mode", false, "Enable agent mode with privileged security context for Container-in-Container support. WARNING: This grants elevated privileges and should only be enabled for trusted workloads.")
 	rootCmd.PersistentFlags().String("job-pod-helper-image", "", "Override the helper init container image. Defaults to the published ECR image matching the runner version. Useful for local development with kind.")
 	rootCmd.PersistentFlags().String("queue", "", "The queue this runner should process jobs from. Empty means the default queue.")

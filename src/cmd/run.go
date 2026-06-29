@@ -121,6 +121,7 @@ func jobWorker(ctx context.Context, wg *sync.WaitGroup, index int, runnerId opsl
 
 		streamer := pkg.NewLogStreamer(
 			logger,
+			logMaxBytes, // per-stream buffer cap tracks the ship-batch size
 			pkg.NewSetOutcomeVarLogProcessor(client, logger, runnerId, jobId, jobNumber),
 			pkg.NewSanitizeLogProcessor(job.Variables),
 			pkg.NewPrefixLogProcessor(logPrefix),

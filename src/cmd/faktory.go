@@ -164,6 +164,7 @@ func runJob(ctx context.Context, helper worker.Helper, job opslevel.RunnerJob) p
 	logPrefix := func() string { return fmt.Sprintf("%s [%d] ", time.Now().UTC().Format(time.RFC3339), 0) }
 	streamer := pkg.NewLogStreamer(
 		logger,
+		logMaxBytes, // per-stream buffer cap tracks the ship-batch size
 		pkg.NewFaktorySetOutcomeProcessor(helper, logger, job.Id),
 		pkg.NewSanitizeLogProcessor(job.Variables),
 		pkg.NewPrefixLogProcessor(logPrefix),

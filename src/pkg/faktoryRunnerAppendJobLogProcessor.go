@@ -21,10 +21,13 @@ type FaktoryAppendJobLogProcessor struct {
 	firstLine         bool
 	lastTime          time.Time
 	elapsed           time.Duration
+	batches           chan []string
+	done              chan struct{}
+	droppedBatches    int
 }
 
 func NewFaktoryAppendJobLogProcessor(helper faktoryWorker.Helper, logger zerolog.Logger, jobId opslevel.ID, maxBytes int, maxTime time.Duration) *FaktoryAppendJobLogProcessor {
-	return &FaktoryAppendJobLogProcessor{
+	s := &FaktoryAppendJobLogProcessor{
 		helper:            helper,
 		logger:            logger,
 		jobId:             jobId,
@@ -34,7 +37,11 @@ func NewFaktoryAppendJobLogProcessor(helper faktoryWorker.Helper, logger zerolog
 		logLinesBytesSize: 0,
 		firstLine:         false,
 		lastTime:          time.Now(),
+		batches:           make(chan []string, shipQueueDepth),
+		done:              make(chan struct{}),
 	}
+	go s.ship()
+	return s
 }
 
 func (s *FaktoryAppendJobLogProcessor) Process(line string) string {
@@ -57,7 +64,7 @@ func (s *FaktoryAppendJobLogProcessor) Process(line string) string {
 	s.elapsed += time.Since(s.lastTime)
 	if s.elapsed > s.maxTime {
 		s.logger.Trace().Msg("Shipping logs because of maxTime ...")
-		s.elapsed = time.Since(time.Now())
+		s.elapsed = 0
 		s.submit()
 	}
 	s.lastTime = time.Now()
@@ -74,21 +81,58 @@ func (s *FaktoryAppendJobLogProcessor) ProcessStderr(line string) string {
 }
 
 func (s *FaktoryAppendJobLogProcessor) Flush(outcome JobOutcome) {
-	if len(s.logLines) > 0 {
-		s.logger.Trace().Msg("Sleeping before append job logs ...")
-		time.Sleep(1 * time.Second)
-		s.submit()
-		s.logger.Trace().Msg("Finished append job logs ...")
+	// The pod is done producing, so the final batch must not be dropped: enqueue
+	// it with a blocking send (the shipper is still draining) before closing.
+	if batch := s.takeBatch(); batch != nil {
+		s.batches <- batch
+	}
+	close(s.batches)
+	<-s.done // wait for in-flight batches to finish enqueuing
+	if s.droppedBatches > 0 {
+		s.logger.Warn().Msgf("dropped %d log batch(es) for job '%s' due to enqueue backpressure", s.droppedBatches, s.jobId)
 	}
 }
 
+// takeBatch detaches the accumulated lines into a standalone batch and starts a
+// fresh buffer; see OpsLevelAppendLogProcessor.takeBatch. Returns nil when there
+// is nothing buffered.
+func (s *FaktoryAppendJobLogProcessor) takeBatch() []string {
+	if len(s.logLines) == 0 {
+		return nil
+	}
+	batch := s.logLines
+	s.logLines = make([]string, 0, len(batch))
+	s.logLinesBytesSize = 0
+	return batch
+}
+
+// submit hands the current batch off to the background shipper. It never blocks;
+// see OpsLevelAppendLogProcessor.submit for the rationale.
 func (s *FaktoryAppendJobLogProcessor) submit() {
-	if len(s.logLines) > 0 {
+	batch := s.takeBatch()
+	if batch == nil {
+		return
+	}
+	select {
+	case s.batches <- batch:
+	default:
+		s.droppedBatches++
+	}
+}
+
+// ship runs on its own goroutine, enqueuing batches to Faktory so the
+// LogStreamer drain loop never blocks on the (network) enqueue call.
+func (s *FaktoryAppendJobLogProcessor) ship() {
+	defer close(s.done)
+	for logLines := range s.batches {
+		if len(logLines) == 0 {
+			continue
+		}
 		job := faktory.NewJob("Runners::Faktory::AppendJobLog", opslevel.RunnerAppendJobLogInput{
 			RunnerId:    "faktory",
 			RunnerJobId: s.jobId,
 			SentAt:      opslevel.NewISO8601DateNow(),
-			Logs:        s.logLines,
+			Logs:        logLines,
 		})
 		job.Queue = "app"
 		batch := s.helper.Bid()
@@ -98,7 +142,7 @@ func (s *FaktoryAppendJobLogProcessor) submit() {
 			})
 			if err != nil {
 				MetricEnqueueBatchFailed.Inc()
-				s.logger.Error().Err(err).Msgf("error while enqueuing append logs for '%d' log line(s) for job '%s'", len(s.logLines), s.jobId)
+				s.logger.Error().Err(err).Msgf("error while enqueuing append logs for '%d' log line(s) for job '%s'", len(logLines), s.jobId)
 			}
 		} else {
 			err := s.helper.With(func(cl *faktory.Client) error {
@@ -106,11 +150,8 @@ func (s *FaktoryAppendJobLogProcessor) submit() {
 			})
 			if err != nil {
 				MetricEnqueueFailed.Inc()
-				s.logger.Error().Err(err).Msgf("error while enqueuing append logs for '%d' log line(s) for job '%s'", len(s.logLines), s.jobId)
+				s.logger.Error().Err(err).Msgf("error while enqueuing append logs for '%d' log line(s) for job '%s'", len(logLines), s.jobId)
 			}
 		}
 	}
-	s.logLinesBytesSize = 0
-	s.logLines = nil
-	s.logLines = []string{}
 }
