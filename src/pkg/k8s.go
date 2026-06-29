@@ -31,6 +31,7 @@ import (
 
 const (
 	ContainerNameHelper = "helper"
+	ContainerNameInit   = "init"
 	ContainerNameJob    = "job"
 )
 
@@ -110,9 +111,15 @@ func NewJobRunner(runnerId string, path string) *JobRunner {
 	}
 }
 
-func (s *JobRunner) getPodEnv(configs []opslevel.RunnerJobVariable) []corev1.EnvVar {
+// getPodEnv returns the env vars to inject into a container for the given
+// scope. Variables with no Scope set are visible to every container; variables
+// with a Scope are only visible to containers running in that scope.
+func (s *JobRunner) getPodEnv(configs []opslevel.RunnerJobVariable, scope opslevel.RunnerJobVariableScope) []corev1.EnvVar {
 	output := make([]corev1.EnvVar, 0)
 	for _, config := range configs {
+		if config.Scope != "" && config.Scope != scope {
+			continue
+		}
 		output = append(output, corev1.EnvVar{
 			Name:  config.Key,
 			Value: config.Value,
@@ -195,6 +202,30 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 		}
 	}
 
+	initContainers := []corev1.Container{
+		{
+			Name:            ContainerNameHelper,
+			Image:           s.podConfig.helperImage(),
+			ImagePullPolicy: s.podConfig.PullPolicy,
+			Command: []string{
+				"cp",
+				"/opslevel-runner",
+				"/mount",
+			},
+			VolumeMounts: []corev1.VolumeMount{
+				{
+					Name:      "shared",
+					ReadOnly:  false,
+					MountPath: "/mount",
+				},
+			},
+		},
+	}
+
+	if len(job.InitCommands) > 0 {
+		initContainers = append(initContainers, s.getInitContainer(job, containerSecurityContext))
+	}
+
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        identifier,
@@ -208,25 +239,7 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 			SecurityContext:               &podSecurityContext,
 			ServiceAccountName:            s.podConfig.ServiceAccountName,
 			NodeSelector:                  s.podConfig.NodeSelector,
-			InitContainers: []corev1.Container{
-				{
-					Name:            ContainerNameHelper,
-					Image:           s.podConfig.helperImage(),
-					ImagePullPolicy: s.podConfig.PullPolicy,
-					Command: []string{
-						"cp",
-						"/opslevel-runner",
-						"/mount",
-					},
-					VolumeMounts: []corev1.VolumeMount{
-						{
-							Name:      "shared",
-							ReadOnly:  false,
-							MountPath: "/mount",
-						},
-					},
-				},
-			},
+			InitContainers:                initContainers,
 			Containers: []corev1.Container{
 				{
 					Name:            ContainerNameJob,
@@ -238,7 +251,7 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 						fmt.Sprintf("sleep %d", s.podConfig.Lifetime),
 					},
 					Resources:       s.podConfig.Resources,
-					Env:             s.getPodEnv(job.Variables),
+					Env:             s.getPodEnv(job.Variables, opslevel.RunnerJobVariableScopeMain),
 					SecurityContext: containerSecurityContext,
 					VolumeMounts: []corev1.VolumeMount{
 						{
@@ -250,6 +263,11 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 							Name:      "shared",
 							ReadOnly:  true,
 							MountPath: "/mount",
+						},
+						{
+							Name:      "workspace",
+							ReadOnly:  false,
+							MountPath: s.podConfig.WorkingDir,
 						},
 					},
 				},
@@ -272,6 +290,59 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 						EmptyDir: &corev1.EmptyDirVolumeSource{},
 					},
 				},
+				{
+					Name: "workspace",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				},
+			},
+		},
+	}
+}
+
+// getInitContainer assembles a container that runs job.InitCommands before the
+// main job container starts. It shares the `workspace` emptyDir with the main
+// container at WorkingDir, so anything written here (e.g. a cloned repo) is
+// visible to the main container. Only variables scoped to "init" or unscoped
+// reach this container — variables scoped to "main" do not.
+func (s *JobRunner) getInitContainer(job opslevel.RunnerJob, securityContext *corev1.SecurityContext) corev1.Container {
+	image := job.InitImage
+	if image == "" {
+		image = job.Image
+	}
+	workingDirectory := path.Join(s.podConfig.WorkingDir, string(job.Id))
+	commands := append(
+		[]string{
+			fmt.Sprintf("mkdir -p %s", workingDirectory),
+			fmt.Sprintf("cd %s", workingDirectory),
+			"set -xv",
+		},
+		job.InitCommands...,
+	)
+	return corev1.Container{
+		Name:            ContainerNameInit,
+		Image:           image,
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Command: []string{
+			s.podConfig.Shell,
+			"-e",
+			"-c",
+			strings.Join(commands, ";\n"),
+		},
+		Resources:       s.podConfig.Resources,
+		Env:             s.getPodEnv(job.Variables, opslevel.RunnerJobVariableScopeInit),
+		SecurityContext: securityContext,
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      "scripts",
+				ReadOnly:  true,
+				MountPath: "/opslevel",
+			},
+			{
+				Name:      "workspace",
+				ReadOnly:  false,
+				MountPath: s.podConfig.WorkingDir,
 			},
 		},
 	}
