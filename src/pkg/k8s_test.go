@@ -173,5 +173,146 @@ func TestDeleteFunctions_RequireClientset(t *testing.T) {
 	t.Log("Delete functions correctly handle nil resources")
 }
 
+func TestGetPodEnv_FiltersByScope(t *testing.T) {
+	// Arrange
+	runner := &JobRunner{logger: zerolog.Nop(), podConfig: &K8SPodConfig{}}
+	vars := []opslevel.RunnerJobVariable{
+		{Key: "BOTH", Value: "shared"},
+		{Key: "INIT_ONLY", Value: "i", Scope: opslevel.RunnerJobVariableScopeInit},
+		{Key: "MAIN_ONLY", Value: "m", Scope: opslevel.RunnerJobVariableScopeMain},
+	}
+
+	// Act
+	initEnv := runner.getPodEnv(vars, opslevel.RunnerJobVariableScopeInit)
+	mainEnv := runner.getPodEnv(vars, opslevel.RunnerJobVariableScopeMain)
+
+	// Assert
+	initKeys := envKeys(initEnv)
+	mainKeys := envKeys(mainEnv)
+	autopilot.Equals(t, []string{"BOTH", "INIT_ONLY"}, initKeys)
+	autopilot.Equals(t, []string{"BOTH", "MAIN_ONLY"}, mainKeys)
+}
+
+func TestGetPodObject_NoInitCommands(t *testing.T) {
+	// Arrange
+	runner := &JobRunner{
+		logger: zerolog.Nop(),
+		podConfig: &K8SPodConfig{
+			Namespace:                     "test",
+			WorkingDir:                    "/workdir",
+			Shell:                         "/bin/sh",
+			SecurityContext:               corev1.PodSecurityContext{},
+			TerminationGracePeriodSeconds: 30,
+		},
+	}
+	job := opslevel.RunnerJob{Image: "alpine:latest"}
+
+	// Act
+	pod := runner.getPodObject("test-pod", map[string]string{}, job)
+
+	// Assert
+	autopilot.Equals(t, 1, len(pod.Spec.InitContainers))
+	autopilot.Equals(t, ContainerNameHelper, pod.Spec.InitContainers[0].Name)
+	// workspace volume is always present, even when no init container runs
+	autopilot.Assert(t, hasVolume(pod, "workspace"), "workspace volume should be present")
+}
+
+func TestGetPodObject_InitContainer(t *testing.T) {
+	// Arrange
+	runner := &JobRunner{
+		logger: zerolog.Nop(),
+		podConfig: &K8SPodConfig{
+			Namespace:                     "test",
+			WorkingDir:                    "/workdir",
+			Shell:                         "/bin/sh",
+			SecurityContext:               corev1.PodSecurityContext{},
+			TerminationGracePeriodSeconds: 30,
+		},
+	}
+	job := opslevel.RunnerJob{
+		Id:           "job-1",
+		Image:        "alpine:latest",
+		InitCommands: []string{"/opslevel/clone-repo ."},
+		Variables: []opslevel.RunnerJobVariable{
+			{Key: "REPO_CLONE_URL", Value: "https://token@example/repo.git", Sensitive: true, Scope: opslevel.RunnerJobVariableScopeInit},
+			{Key: "REPO_URL", Value: "https://example/repo.git"},
+			{Key: "AI_API_KEY", Value: "secret", Sensitive: true, Scope: opslevel.RunnerJobVariableScopeMain},
+		},
+	}
+
+	// Act
+	pod := runner.getPodObject("test-pod", map[string]string{}, job)
+
+	// Assert: two init containers (helper, init); init runs second so the
+	// runner binary is already on the shared mount by the time it boots.
+	autopilot.Equals(t, 2, len(pod.Spec.InitContainers))
+	autopilot.Equals(t, ContainerNameHelper, pod.Spec.InitContainers[0].Name)
+	autopilot.Equals(t, ContainerNameInit, pod.Spec.InitContainers[1].Name)
+
+	initContainer := pod.Spec.InitContainers[1]
+	// Defaults to the job image when InitImage is unset.
+	autopilot.Equals(t, "alpine:latest", initContainer.Image)
+	// REPO_CLONE_URL and REPO_URL reach the init container; AI_API_KEY does not.
+	autopilot.Equals(t, []string{"REPO_CLONE_URL", "REPO_URL"}, envKeys(initContainer.Env))
+
+	mainContainer := pod.Spec.Containers[0]
+	// REPO_CLONE_URL is excluded from the main container — this is the security
+	// goal of init-container clones.
+	autopilot.Equals(t, []string{"REPO_URL", "AI_API_KEY"}, envKeys(mainContainer.Env))
+
+	// Both init and main mount the workspace RW at WorkingDir.
+	autopilot.Assert(t, mountIsRW(initContainer.VolumeMounts, "workspace"), "init: workspace should be RW")
+	autopilot.Assert(t, mountIsRW(mainContainer.VolumeMounts, "workspace"), "main: workspace should be RW")
+}
+
+func TestGetPodObject_InitImageOverride(t *testing.T) {
+	// Arrange
+	runner := &JobRunner{
+		logger: zerolog.Nop(),
+		podConfig: &K8SPodConfig{
+			Namespace: "test", WorkingDir: "/workdir", Shell: "/bin/sh",
+			SecurityContext: corev1.PodSecurityContext{}, TerminationGracePeriodSeconds: 30,
+		},
+	}
+	job := opslevel.RunnerJob{
+		Image:        "alpine:latest",
+		InitImage:    "git-tools:latest",
+		InitCommands: []string{"git --version"},
+	}
+
+	// Act
+	pod := runner.getPodObject("test-pod", map[string]string{}, job)
+
+	// Assert: InitImage takes precedence over Image for the init container.
+	autopilot.Equals(t, "git-tools:latest", pod.Spec.InitContainers[1].Image)
+	autopilot.Equals(t, "alpine:latest", pod.Spec.Containers[0].Image)
+}
+
+func envKeys(env []corev1.EnvVar) []string {
+	keys := make([]string, 0, len(env))
+	for _, e := range env {
+		keys = append(keys, e.Name)
+	}
+	return keys
+}
+
+func hasVolume(pod *corev1.Pod, name string) bool {
+	for _, v := range pod.Spec.Volumes {
+		if v.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func mountIsRW(mounts []corev1.VolumeMount, name string) bool {
+	for _, m := range mounts {
+		if m.Name == name {
+			return !m.ReadOnly
+		}
+	}
+	return false
+}
+
 // Suppress unused import warning for policyv1
 var _ = policyv1.PodDisruptionBudget{}

@@ -1,8 +1,21 @@
+version: "2"
 run:
   timeout: 2m
-linters-settings:
-  errcheck:
-    exclude-functions:
-      - (*github.com/spf13/pflag.PFlagSet).GetString
-      - github.com/spf13/viper.BindEnv
-      - github.com/spf13/viper.BindPFlags
+linters:
+  settings:
+    errcheck:
+      exclude-functions:
+        - (*github.com/spf13/pflag.PFlagSet).GetString
+        - github.com/spf13/viper.BindEnv
+        - github.com/spf13/viper.BindPFlags
+    staticcheck:
+      # v2 enables staticcheck's ST* (style) and QF* (quick-fix) rule families
+      # by default; v1 had them off. Disable both so this upgrade is purely a
+      # version bump, not a code-style sweep. Re-enable in a follow-up if desired.
+      checks:
+        - "all"
+        - "-ST1000"
+        - "-ST1003"
+        - "-ST1020"
+        - "-QF1002"
+        - "-QF1003"
