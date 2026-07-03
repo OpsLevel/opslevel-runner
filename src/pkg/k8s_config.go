@@ -28,6 +28,7 @@ type K8SPodConfig struct {
 	SecurityContext               corev1.PodSecurityContext   `yaml:"securityContext"`
 	NodeSelector                  map[string]string           `yaml:"nodeSelector"`
 	AgentMode                     bool                        `yaml:"agentMode"`
+	Queue                         string                      `yaml:"queue"`
 	HelperImage                   string                      `yaml:"helperImage"`
 }
 
@@ -50,6 +51,7 @@ func ReadPodConfig(path string) (*K8SPodConfig, error) {
 			},
 			TerminationGracePeriodSeconds: 5,
 			AgentMode:                     viper.GetBool("job-agent-mode"),
+			Queue:                         viper.GetString("queue"),
 			HelperImage:                   viper.GetString("job-pod-helper-image"),
 		},
 	}
