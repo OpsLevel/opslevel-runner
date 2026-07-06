@@ -46,6 +46,8 @@ func init() {
 	rootCmd.PersistentFlags().Int64("job-pod-requests-memory", 1024, "The job pod resource requests in MB.")
 	rootCmd.PersistentFlags().Int64("job-pod-limits-cpu", 1000, "The job pod resource limits cpu millicores.")
 	rootCmd.PersistentFlags().Int64("job-pod-limits-memory", 1024, "The job pod resource limits in MB.")
+	rootCmd.PersistentFlags().Int64("job-pod-requests-ephemeral-storage", 0, "The job pod resource requests ephemeral storage in MB. 0 leaves the request unset.")
+	rootCmd.PersistentFlags().Int64("job-pod-limits-ephemeral-storage", 0, "The job pod resource limits ephemeral storage in MB. 0 leaves the limit unset.")
 	rootCmd.PersistentFlags().String("job-pod-shell", "/bin/sh", "The job pod shell to use for commands run inside the pod.")
 	rootCmd.PersistentFlags().String("job-pod-workdir", "/jobs", "The job pod working directory.")
 	rootCmd.PersistentFlags().Int("job-pod-log-max-interval", 30, "The max amount of time between when pod logs are shipped to OpsLevel. Works in tandem with 'job-pod-log-max-size'")

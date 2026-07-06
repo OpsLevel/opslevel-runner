@@ -53,6 +53,14 @@ func ReadPodConfig(path string) (*K8SPodConfig, error) {
 			HelperImage:                   viper.GetString("job-pod-helper-image"),
 		},
 	}
+	// Ephemeral storage is only set when configured so existing deployments are unaffected;
+	// a literal 0 limit would kill any pod that writes to disk.
+	if v := viper.GetInt64("job-pod-requests-ephemeral-storage"); v > 0 {
+		config.Kubernetes.Resources.Requests[corev1.ResourceEphemeralStorage] = *resource.NewQuantity(v*1024*1024, resource.BinarySI)
+	}
+	if v := viper.GetInt64("job-pod-limits-ephemeral-storage"); v > 0 {
+		config.Kubernetes.Resources.Limits[corev1.ResourceEphemeralStorage] = *resource.NewQuantity(v*1024*1024, resource.BinarySI)
+	}
 	// Early out with viper defaults if config file doesn't exist
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return &config.Kubernetes, nil

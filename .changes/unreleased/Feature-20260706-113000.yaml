@@ -1,0 +1,3 @@
+kind: Feature
+body: Add --job-pod-requests-ephemeral-storage and --job-pod-limits-ephemeral-storage flags (in MB) to set the job pod's ephemeral-storage request and limit; both default to unset
+time: 2026-07-06T11:30:00.000000000Z
