@@ -218,7 +218,7 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 						},
 						Limits: corev1.ResourceList{
 							corev1.ResourceCPU:    *resource.NewMilliQuantity(s.jobPodConfig.CpuLimit, resource.DecimalSI),
-							corev1.ResourceMemory: *resource.NewQuantity(s.jobPodConfig.MemLimit*1024*1204, resource.BinarySI),
+							corev1.ResourceMemory: *resource.NewQuantity(s.jobPodConfig.MemLimit*1024*1024, resource.BinarySI),
 						},
 					},
 					Env: s.getPodEnv(job.Variables),
