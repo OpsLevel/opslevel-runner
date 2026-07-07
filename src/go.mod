@@ -2,7 +2,7 @@ module github.com/opslevel/opslevel-runner
 
 go 1.26.0
 
-toolchain go1.26.5
+toolchain go1.26.4
 
 require (
 	github.com/contribsys/faktory v1.9.4
