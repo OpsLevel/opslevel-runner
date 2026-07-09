@@ -24,7 +24,8 @@ builds:
 archives:
   - name_template: '{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}'
 dockers_v2:
-  - images:
+  - dockerfile: ../Dockerfile
+    images:
     - "public.ecr.aws/opslevel/opslevel-runner"
     tags:
     - "latest"
