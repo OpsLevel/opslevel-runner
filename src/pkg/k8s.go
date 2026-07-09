@@ -24,6 +24,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/utils/ptr"
 
 	"github.com/opslevel/opslevel-go/v2026"
 	"github.com/rs/zerolog"
@@ -132,7 +133,7 @@ func (s *JobRunner) getPodEnv(configs []opslevel.RunnerJobVariable, scope opslev
 	return output
 }
 
-func extractJobVariable(vars []opslevel.RunnerJobVariable, key string) string {
+func getRunnerJobVariable(vars []opslevel.RunnerJobVariable, key string) string {
 	for _, v := range vars {
 		if v.Key == key {
 			return v.Value
@@ -146,7 +147,6 @@ func (s *JobRunner) getConfigMapObject(identifier string, job opslevel.RunnerJob
 	for _, file := range job.Files {
 		data[file.Name] = file.Contents
 	}
-	immutable := true
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      identifier,
@@ -160,13 +160,12 @@ func (s *JobRunner) getConfigMapObject(identifier string, job opslevel.RunnerJob
 			//	},
 			//},
 		},
-		Immutable: &immutable,
+		Immutable: ptr.To(true),
 		Data:      data,
 	}
 }
 
 func (s *JobRunner) getPBDObject(identifier string, selector *metav1.LabelSelector) *policyv1.PodDisruptionBudget {
-	maxUnavailable := intstr.Parse("0")
 	return &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      identifier,
@@ -180,15 +179,14 @@ func (s *JobRunner) getPBDObject(identifier string, selector *metav1.LabelSelect
 			//},
 		},
 		Spec: policyv1.PodDisruptionBudgetSpec{
-			MaxUnavailable: &maxUnavailable,
+			MaxUnavailable: ptr.To(intstr.Parse("0")),
 			Selector:       selector,
 		},
 	}
 }
 
 func executable() *int32 {
-	value := int32(511)
-	return &value
+	return ptr.To(int32(511))
 }
 
 func getContainerNames(containers []corev1.Container) []string {
@@ -206,20 +204,17 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 	podSecurityContext := s.podConfig.SecurityContext
 	if s.podConfig.AgentMode {
 		// Agent mode jobs need root user for Docker daemon
-		runAsUser := int64(0)
-		fsGroup := int64(0)
 		podSecurityContext = corev1.PodSecurityContext{
-			RunAsUser: &runAsUser,
-			FSGroup:   &fsGroup,
+			RunAsUser: ptr.To(int64(0)),
+			FSGroup:   ptr.To(int64(0)),
 		}
 	}
 
 	var containerSecurityContext *corev1.SecurityContext
 	if s.podConfig.AgentMode {
 		// Agent mode jobs need privileged mode for creating containers within container
-		privileged := true
 		containerSecurityContext = &corev1.SecurityContext{
-			Privileged: &privileged,
+			Privileged: ptr.To(true),
 		}
 	}
 
@@ -310,14 +305,13 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 	// working with the queue name; can't use agentMode until agentMode stops
 	// implying privileged mode
 	if s.podConfig.Queue == "coding-agent" {
-		proxyAllowedDomains := extractJobVariable(job.Variables, "PROXY_ALLOWED_DOMAINS")
+		proxyAllowedDomains := getRunnerJobVariable(job.Variables, "PROXY_ALLOWED_DOMAINS")
 		squidUID := int64(13)
-		alwaysPolicy := corev1.ContainerRestartPolicyAlways
 		initContainers = append(initContainers, corev1.Container{
 			Name:            "squid",
 			Image:           SquidProxyImage,
 			ImagePullPolicy: corev1.PullIfNotPresent,
-			RestartPolicy:   &alwaysPolicy,
+			RestartPolicy:   ptr.To(corev1.ContainerRestartPolicyAlways),
 			Command:         []string{"/bin/sh", "-c"},
 			Args: []string{`set -eu
 : > /srv/squid/custom-allowed-domains.conf
