@@ -19,8 +19,7 @@ type FaktoryAppendJobLogProcessor struct {
 	logLines          []string
 	logLinesBytesSize int
 	firstLine         bool
-	lastTime          time.Time
-	elapsed           time.Duration
+	lastSubmitTime    time.Time
 }
 
 func NewFaktoryAppendJobLogProcessor(helper faktoryWorker.Helper, logger zerolog.Logger, jobId opslevel.ID, maxBytes int, maxTime time.Duration) *FaktoryAppendJobLogProcessor {
@@ -33,7 +32,7 @@ func NewFaktoryAppendJobLogProcessor(helper faktoryWorker.Helper, logger zerolog
 		logLines:          []string{},
 		logLinesBytesSize: 0,
 		firstLine:         false,
-		lastTime:          time.Now(),
+		lastSubmitTime:    time.Now(),
 	}
 }
 
@@ -54,15 +53,16 @@ func (s *FaktoryAppendJobLogProcessor) Process(line string) string {
 		s.submit()
 	}
 
-	s.elapsed += time.Since(s.lastTime)
-	if s.elapsed > s.maxTime {
+	return line
+}
+
+// Tick ships buffered logs once maxTime has elapsed since the last submit,
+// so a job that goes quiet still has its logs delivered on schedule.
+func (s *FaktoryAppendJobLogProcessor) Tick() {
+	if len(s.logLines) > 0 && time.Since(s.lastSubmitTime) > s.maxTime {
 		s.logger.Trace().Msg("Shipping logs because of maxTime ...")
-		s.elapsed = time.Since(time.Now())
 		s.submit()
 	}
-	s.lastTime = time.Now()
-
-	return line
 }
 
 func (s *FaktoryAppendJobLogProcessor) ProcessStdout(line string) string {
@@ -111,6 +111,6 @@ func (s *FaktoryAppendJobLogProcessor) submit() {
 		}
 	}
 	s.logLinesBytesSize = 0
-	s.logLines = nil
 	s.logLines = []string{}
+	s.lastSubmitTime = time.Now()
 }

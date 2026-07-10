@@ -15,6 +15,13 @@ type LogProcessor interface {
 	Flush(outcome JobOutcome)
 }
 
+// tickable is optionally implemented by processors that need to do periodic
+// work even when no new lines arrive (e.g. time-based log shipping). Tick is
+// called from the streamer's Run loop on every ticker interval.
+type tickable interface {
+	Tick()
+}
+
 type LogStreamer struct {
 	Stdout     *SafeBuffer
 	Stderr     *SafeBuffer
@@ -91,6 +98,11 @@ func (s *LogStreamer) Run(ctx context.Context) {
 			for _, stream := range s.streams() {
 				for strings.Contains(stream.buf.String(), "\n") {
 					s.processLine(stream)
+				}
+			}
+			for _, processor := range s.processors {
+				if t, ok := processor.(tickable); ok {
+					t.Tick()
 				}
 			}
 		}
