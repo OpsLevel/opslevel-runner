@@ -193,6 +193,33 @@ func TestGetPodEnv_FiltersByScope(t *testing.T) {
 	autopilot.Equals(t, []string{"BOTH", "MAIN_ONLY"}, mainKeys)
 }
 
+func TestGetRunnerJobVariable_ReturnsMatchingValue(t *testing.T) {
+	// Arrange
+	vars := []opslevel.RunnerJobVariable{
+		{Key: "FOO", Value: "bar"},
+		{Key: "account_id", Value: "acct-123"},
+	}
+
+	// Act
+	value := getRunnerJobVariable(vars, "account_id")
+
+	// Assert
+	autopilot.Equals(t, "acct-123", value)
+}
+
+func TestGetRunnerJobVariable_ReturnsEmptyWhenMissing(t *testing.T) {
+	// Arrange
+	vars := []opslevel.RunnerJobVariable{
+		{Key: "FOO", Value: "bar"},
+	}
+
+	// Act
+	value := getRunnerJobVariable(vars, "account_id")
+
+	// Assert
+	autopilot.Equals(t, "", value)
+}
+
 func TestGetPodObject_NoInitCommands(t *testing.T) {
 	// Arrange
 	runner := &JobRunner{

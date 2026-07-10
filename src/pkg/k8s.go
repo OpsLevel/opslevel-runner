@@ -111,6 +111,16 @@ func NewJobRunner(runnerId string, path string) *JobRunner {
 	}
 }
 
+// getRunnerJobVariable returns the value of the job variable with the given key, if present.
+func getRunnerJobVariable(configs []opslevel.RunnerJobVariable, key string) string {
+	for _, config := range configs {
+		if config.Key == key {
+			return config.Value
+		}
+	}
+	return ""
+}
+
 // getPodEnv returns the env vars to inject into a container for the given
 // scope. Variables with no Scope set are visible to every container; variables
 // with a Scope are only visible to containers running in that scope.
@@ -371,6 +381,16 @@ func (s *JobRunner) Run(ctx context.Context, job opslevel.RunnerJob, stdout, std
 			Message: fmt.Sprintf("failed to create label selector REASON: %s", err),
 			Outcome: opslevel.RunnerJobOutcomeEnumFailed,
 		}
+	}
+	// Descriptive labels for observability (e.g. DataDog podLabelsAsTags), so
+	// running pods can be filtered by account/job/mode without parsing the pod
+	// name. Added after building the selector so they stay out of the PDB
+	// selector, which the instance label already makes unique.
+	labels["app.kubernetes.io/name"] = "opslevel-job"
+	labels["opslevel.com/job-id"] = id
+	labels["opslevel.com/mode"] = viper.GetString("mode")
+	if accountId := getRunnerJobVariable(job.Variables, "account_id"); accountId != "" {
+		labels["opslevel.com/account-id"] = accountId
 	}
 	// TODO: manage pods based on image for re-use?
 	cfgMap, err := s.CreateConfigMap(ctx, s.getConfigMapObject(identifier, job))
