@@ -389,8 +389,13 @@ func (s *JobRunner) Run(ctx context.Context, job opslevel.RunnerJob, stdout, std
 	labels["app.kubernetes.io/name"] = "opslevel-job"
 	labels["opslevel.com/job-id"] = id
 	labels["opslevel.com/mode"] = viper.GetString("mode")
-	if accountId := getRunnerJobVariable(job.Variables, "account_id"); accountId != "" {
+	// Variable keys arrive uppercased/sanitized by the OpsLevel API (see
+	// RunnerJobType#format_key_as_valid_env_var_name), so match the uppercase key.
+	if accountId := getRunnerJobVariable(job.Variables, "ACCOUNT_ID"); accountId != "" {
 		labels["opslevel.com/account-id"] = accountId
+	}
+	if jobType := getRunnerJobVariable(job.Variables, "JOB_TYPE"); jobType != "" {
+		labels["opslevel.com/job-type"] = jobType
 	}
 	// TODO: manage pods based on image for re-use?
 	cfgMap, err := s.CreateConfigMap(ctx, s.getConfigMapObject(identifier, job))
