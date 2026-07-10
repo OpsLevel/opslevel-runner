@@ -21,17 +21,18 @@ type LogStreamer struct {
 	processors []LogProcessor
 	logger     zerolog.Logger
 	quit       chan bool
+	done       chan struct{}
 	logBuffer  *ring.Ring
 }
 
 func NewLogStreamer(logger zerolog.Logger, processors ...LogProcessor) LogStreamer {
-	quit := make(chan bool)
 	return LogStreamer{
 		Stdout:     &SafeBuffer{},
 		Stderr:     &SafeBuffer{},
 		processors: processors,
 		logger:     logger,
-		quit:       quit,
+		quit:       make(chan bool),
+		done:       make(chan struct{}),
 		logBuffer:  ring.New(20),
 	}
 }
@@ -52,10 +53,10 @@ func (s *LogStreamer) streams() []logStream {
 	}
 }
 
-func (s *LogStreamer) processLine(stream logStream) {
+func (s *LogStreamer) processLine(stream logStream) bool {
 	line, _ := stream.buf.ReadString('\n')
 	if line == "" {
-		return
+		return false
 	}
 	line = strings.TrimSuffix(line, "\n")
 	for _, processor := range s.processors {
@@ -63,6 +64,7 @@ func (s *LogStreamer) processLine(stream logStream) {
 	}
 	s.logBuffer.Value = line
 	s.logBuffer = s.logBuffer.Next()
+	return true
 }
 
 func (s *LogStreamer) GetLogBuffer() []string {
@@ -76,6 +78,7 @@ func (s *LogStreamer) GetLogBuffer() []string {
 }
 
 func (s *LogStreamer) Run(ctx context.Context) {
+	defer close(s.done)
 	s.logger.Trace().Msg("Starting log streamer ...")
 	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()
@@ -102,22 +105,32 @@ func (s *LogStreamer) Flush(outcome JobOutcome) {
 	ticker := time.NewTicker(200 * time.Millisecond)
 	defer ticker.Stop()
 	timeout := time.After(30 * time.Second)
+wait:
 	for strings.Contains(s.Stderr.String(), "\n") || strings.Contains(s.Stdout.String(), "\n") {
 		select {
 		case <-ticker.C:
 			// Continue waiting
+		case <-s.done:
+			// 'Run' already exited (context cancelled); drain the rest below.
+			break wait
 		case <-timeout:
 			s.logger.Warn().Msg("Flush timeout reached, proceeding with remaining data")
-			goto done
+			break wait
 		}
 	}
-done:
+	// Stop 'Run' if it is still going — it may have already exited via ctx.Done,
+	// in which case there is no receiver for quit and sending would block forever.
+	select {
+	case s.quit <- true:
+	case <-s.done:
+	}
+	<-s.done
 	s.logger.Trace().Msg("Finished log streamer flush ...")
-	s.quit <- true
-	time.Sleep(200 * time.Millisecond) // Allow 'Run' goroutine to quit
-	// Drain any partial line that never received a terminating newline.
+	// Drain anything 'Run' did not process, including a partial line that never
+	// received a terminating newline.
 	for _, stream := range s.streams() {
-		s.processLine(stream)
+		for s.processLine(stream) {
+		}
 	}
 	s.logger.Trace().Msg("Flushing log processors ...")
 	for i := len(s.processors) - 1; i >= 0; i-- {

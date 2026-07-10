@@ -46,6 +46,36 @@ func TestLogStreamerPartialLineStdout(t *testing.T) {
 	autopilot.Equals(t, []string{"partial", "trailing-no-newline"}, cap.lines)
 }
 
+func TestLogStreamerFlushAfterContextCancel(t *testing.T) {
+	cap := &captureProcessor{}
+	s := NewLogStreamer(zerolog.Nop(), cap)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go s.Run(ctx)
+
+	_, _ = s.Stdout.Write([]byte("line-one\nline-two\n"))
+	time.Sleep(100 * time.Millisecond)
+
+	// Cancel the context so 'Run' exits on its own, then write more lines that
+	// only Flush can drain.
+	cancel()
+	<-s.done
+	_, _ = s.Stdout.Write([]byte("late-one\nlate-two"))
+
+	flushed := make(chan struct{})
+	go func() {
+		s.Flush(JobOutcome{})
+		close(flushed)
+	}()
+	select {
+	case <-flushed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Flush deadlocked after context cancellation")
+	}
+
+	autopilot.Equals(t, []string{"line-one", "line-two", "late-one", "late-two"}, cap.lines)
+}
+
 func TestLogStreamerPartialLineStderr(t *testing.T) {
 	cap := &captureProcessor{}
 	s := NewLogStreamer(zerolog.Nop(), cap)
