@@ -318,13 +318,25 @@ func TestGetPodObject_CodingAgentQueue_noInitCommand(t *testing.T) {
 	// Act
 	pod := runner.getPodObject("test-pod", map[string]string{}, job)
 
-	// Assert: helper + squid, in that order; no job-init because
-	// job.InitCommands is empty.
-	autopilot.Equals(t, 2, len(pod.Spec.InitContainers))
+	// Assert: helper + iptables-setup + squid, in that order; no job-init
+	// because job.InitCommands is empty. iptables-setup precedes squid so
+	// the OUTPUT chain is populated before squid starts making outbound
+	// connections.
+	autopilot.Equals(t, 3, len(pod.Spec.InitContainers))
 	autopilot.Equals(t, ContainerNameHelper, pod.Spec.InitContainers[0].Name)
-	autopilot.Equals(t, "squid", pod.Spec.InitContainers[1].Name)
+	autopilot.Equals(t, "iptables-setup", pod.Spec.InitContainers[1].Name)
+	autopilot.Equals(t, "squid", pod.Spec.InitContainers[2].Name)
 
-	squid := pod.Spec.InitContainers[1]
+	// iptables-setup runs with NET_ADMIN so it can populate the pod netns'
+	// OUTPUT chain. It's a run-to-completion init (RestartPolicy nil), not
+	// a native sidecar.
+	iptables := pod.Spec.InitContainers[1]
+	autopilot.Assert(t, iptables.RestartPolicy == nil, "iptables-setup must not be a native sidecar")
+	autopilot.Assert(t, iptables.SecurityContext != nil, "iptables-setup must set SecurityContext")
+	autopilot.Assert(t, iptables.SecurityContext.Capabilities != nil, "iptables-setup must add NET_ADMIN")
+	autopilot.Equals(t, []corev1.Capability{"NET_ADMIN"}, iptables.SecurityContext.Capabilities.Add)
+
+	squid := pod.Spec.InitContainers[2]
 	// Native sidecar: RestartPolicy=Always so kubelet gates the next init
 	// container on its startupProbe.
 	autopilot.Assert(t, squid.RestartPolicy != nil, "squid must have RestartPolicy set")
@@ -342,6 +354,16 @@ func TestGetPodObject_CodingAgentQueue_noInitCommand(t *testing.T) {
 	// Squid volumes wired.
 	autopilot.Assert(t, hasVolume(pod, "squid-config"), "squid-config volume should be present")
 	autopilot.Assert(t, hasVolume(pod, "squid-runtime"), "squid-runtime volume should be present")
+
+	// Main container must drop NET_ADMIN + NET_RAW so a hostile agent
+	// cannot alter iptables rules or open raw sockets.
+	mainSC := pod.Spec.Containers[0].SecurityContext
+	autopilot.Assert(t, mainSC != nil, "main container must have SecurityContext for coding-agent")
+	autopilot.Assert(t, mainSC.Capabilities != nil, "main container must have Capabilities")
+	autopilot.Equals(t,
+		[]corev1.Capability{"NET_ADMIN", "NET_RAW"},
+		mainSC.Capabilities.Drop,
+	)
 }
 
 func TestGetPodObject_NonCodingAgentQueue(t *testing.T) {
@@ -402,12 +424,16 @@ func TestGetPodObject_CodingAgentQueue_initCommand(t *testing.T) {
 	// Act
 	pod := runner.getPodObject("test-pod", map[string]string{}, job)
 
-	// Assert: squid must precede the job-init container so the proxy is up
-	// and the ACL list is authoritative before the init clone runs.
-	autopilot.Equals(t, 3, len(pod.Spec.InitContainers))
+	// Assert: helper + iptables-setup + squid + job-init, in that order.
+	// iptables-setup must precede squid so the OUTPUT chain is populated
+	// before squid egress starts. squid must precede the job-init so the
+	// proxy is up and the ACL list is authoritative before the init clone
+	// runs.
+	autopilot.Equals(t, 4, len(pod.Spec.InitContainers))
 	autopilot.Equals(t, ContainerNameHelper, pod.Spec.InitContainers[0].Name)
-	autopilot.Equals(t, "squid", pod.Spec.InitContainers[1].Name)
-	autopilot.Equals(t, ContainerNameInit, pod.Spec.InitContainers[2].Name)
+	autopilot.Equals(t, "iptables-setup", pod.Spec.InitContainers[1].Name)
+	autopilot.Equals(t, "squid", pod.Spec.InitContainers[2].Name)
+	autopilot.Equals(t, ContainerNameInit, pod.Spec.InitContainers[3].Name)
 }
 
 func envKeys(env []corev1.EnvVar) []string {

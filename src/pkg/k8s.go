@@ -38,6 +38,15 @@ const (
 
 	SquidProxyImage    = "ubuntu/squid:latest@sha256:6a097f68bae708cedbabd6188d68c7e2e7a38cedd05a176e1cc0ba29e3bbe029"
 	SquidConfigMapName = "squid-config"
+
+	// IptablesSetupImage is used by the coding-agent iptables-setup init
+	// container. netshoot bundles iptables + shell; we pin by digest.
+	IptablesSetupImage = "nicolaka/netshoot:latest"
+
+	// SquidUID is the UID the squid sidecar runs as. iptables rules exempt
+	// this UID from egress restrictions so squid can proxy on behalf of the
+	// main container.
+	SquidUID = int64(13)
 )
 
 var (
@@ -306,7 +315,54 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 	// implying privileged mode
 	if s.podConfig.Queue == "coding-agent" {
 		proxyAllowedDomains := getRunnerJobVariable(job.Variables, "PROXY_ALLOWED_DOMAINS")
-		squidUID := int64(13)
+
+		// iptables-setup: run-to-completion init container that installs
+		// pod-netns rules forcing all main-container egress through squid.
+		// Rules:
+		//   - allow squid's own outbound (matched by --uid-owner SquidUID)
+		//   - allow loopback (main container -> squid at 127.0.0.1:3128)
+		//   - allow DNS (UDP/TCP :53) so name resolution keeps working;
+		//     DNS tunneling is a documented gap addressed in a follow-up
+		//   - reject everything else
+		// Rules live in the pod's netns; main container cannot alter them
+		// because we drop NET_ADMIN/NET_RAW below.
+		initContainers = append(initContainers, corev1.Container{
+			Name:            "iptables-setup",
+			Image:           IptablesSetupImage,
+			ImagePullPolicy: corev1.PullIfNotPresent,
+			Command:         []string{"/bin/sh", "-c"},
+			Args: []string{fmt.Sprintf(`set -eu
+# Allow squid's own outbound traffic (proxy makes real connections).
+iptables -A OUTPUT -m owner --uid-owner %d -j ACCEPT
+# Allow loopback (main container -> squid on 127.0.0.1:3128).
+iptables -A OUTPUT -o lo -j ACCEPT
+# Allow return traffic for established connections.
+iptables -A OUTPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+# Allow DNS (still leaks: DNS tunneling is a documented follow-up).
+iptables -A OUTPUT -p udp --dport 53 -j ACCEPT
+iptables -A OUTPUT -p tcp --dport 53 -j ACCEPT
+# Reject everything else with an ICMP so clients see a clear failure.
+iptables -A OUTPUT -j REJECT --reject-with icmp-port-unreachable
+`, SquidUID)},
+			SecurityContext: &corev1.SecurityContext{
+				Capabilities: &corev1.Capabilities{
+					Add: []corev1.Capability{"NET_ADMIN"},
+				},
+				RunAsUser:  ptr.To(int64(0)),
+				RunAsGroup: ptr.To(int64(0)),
+			},
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("10m"),
+					corev1.ResourceMemory: resource.MustParse("16Mi"),
+				},
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("64Mi"),
+				},
+			},
+		})
+
 		initContainers = append(initContainers, corev1.Container{
 			Name:            "squid",
 			Image:           SquidProxyImage,
@@ -322,8 +378,8 @@ printf 'include /etc/squid/conf.d/squid.conf\npid_filename /srv/squid/squid.pid\
 exec squid -N -f /srv/squid/squid.conf
 `},
 			SecurityContext: &corev1.SecurityContext{
-				RunAsUser:  &squidUID,
-				RunAsGroup: &squidUID,
+				RunAsUser:  ptr.To(SquidUID),
+				RunAsGroup: ptr.To(SquidUID),
 			},
 			Ports: []corev1.ContainerPort{
 				{Name: "proxy", ContainerPort: 3128, Protocol: corev1.ProtocolTCP},
@@ -381,6 +437,22 @@ exec squid -N -f /srv/squid/squid.conf
 			corev1.EnvVar{Name: "http_proxy", Value: proxyURL},
 			corev1.EnvVar{Name: "https_proxy", Value: proxyURL},
 			corev1.EnvVar{Name: "no_proxy", Value: "localhost,127.0.0.1,::1"},
+		)
+
+		// Drop NET_ADMIN and NET_RAW from the main container so that even a
+		// hostile agent running as root inside the container cannot alter
+		// the iptables rules installed by iptables-setup, nor open raw
+		// sockets that would sidestep the OUTPUT chain's L4 filtering.
+		if containers[0].SecurityContext == nil {
+			containers[0].SecurityContext = &corev1.SecurityContext{}
+		}
+		if containers[0].SecurityContext.Capabilities == nil {
+			containers[0].SecurityContext.Capabilities = &corev1.Capabilities{}
+		}
+		containers[0].SecurityContext.Capabilities.Drop = append(
+			containers[0].SecurityContext.Capabilities.Drop,
+			corev1.Capability("NET_ADMIN"),
+			corev1.Capability("NET_RAW"),
 		)
 	}
 

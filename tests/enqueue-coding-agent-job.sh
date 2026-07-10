@@ -253,6 +253,101 @@ probe https://www.amazon.ca/   allow
 probe https://github.com/      allow
 probe https://bitbucket.org/   allow
 probe https://xkcd.com/2347/   deny
+
+echo "==================================================================="
+echo "HARDENING VERIFICATION: iptables must block bypasses around squid."
+echo "Each check attempts a common bypass technique against xkcd.com."
+echo "With iptables in place, all three should FAIL (BLOCKED = pass)."
+echo "==================================================================="
+echo ""
+
+hardening_result() {
+  # $1 = label, $2 = detail, $3 = "blocked" (want) or "reached" (fail)
+  local label="$1" detail="$2" reached="$3"
+  if [ "$reached" = "blocked" ]; then
+    echo "RESULT: PASS  $label -> BLOCKED ($detail)"
+  else
+    echo "RESULT: FAIL  $label -> REACHED TARGET ($detail)"
+    echo "        ^ iptables did not prevent this bypass"
+  fi
+  echo ""
+}
+
+echo "-------------------------------------------------------------------"
+echo "HARDENING 1: unset proxy env vars, curl direct to xkcd.com"
+echo "  (expects iptables REJECT on the direct TCP connect)"
+echo "-------------------------------------------------------------------"
+# Rely on curl'"'"'s exit code, not its stdout. When the OUTPUT chain REJECTs
+# the packet, curl exits non-zero (typically 7 = "Failed to connect").
+if env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY \
+    curl -sS --max-time 15 -o /dev/null https://xkcd.com/2347/ >/dev/null 2>&1; then
+  hardening_result "unset-env-curl" "curl succeeded (bypass reached target)" "reached"
+else
+  hardening_result "unset-env-curl" "curl exit non-zero (blocked at L4)" "blocked"
+fi
+
+echo "-------------------------------------------------------------------"
+echo "HARDENING 2: bash /dev/tcp raw socket to xkcd.com:443"
+echo "  (expects iptables REJECT on the direct TCP connect)"
+echo "-------------------------------------------------------------------"
+if timeout 10 bash -c "exec 3<>/dev/tcp/xkcd.com/443 && echo open <&3" >/dev/null 2>&1; then
+  hardening_result "raw-tcp-socket" "TCP handshake succeeded on :443" "reached"
+else
+  hardening_result "raw-tcp-socket" "TCP handshake failed" "blocked"
+fi
+
+echo "-------------------------------------------------------------------"
+echo "HARDENING 3: curl --resolve pinning a rogue IP for xkcd.com"
+echo "  (expects iptables REJECT; --resolve bypasses DNS-based ACLs)"
+echo "-------------------------------------------------------------------"
+# 1.1.1.1 is Cloudflare public DNS; not xkcd but not a private range. If the
+# packet gets out, the request reaches SOMETHING; if it doesn'"'"'t, curl fails.
+if timeout 10 curl -sS --max-time 8 --resolve xkcd.com:443:1.1.1.1 \
+    -o /dev/null -w "%{http_code}" https://xkcd.com/ 2>/dev/null | grep -q "^[1-5]"; then
+  hardening_result "curl-resolve-rogue-ip" "reached some endpoint at 1.1.1.1:443" "reached"
+else
+  hardening_result "curl-resolve-rogue-ip" "connection failed" "blocked"
+fi
+
+echo "==================================================================="
+echo "CAPABILITIES CHECK: main container must not have NET_ADMIN/NET_RAW"
+echo "==================================================================="
+if command -v capsh >/dev/null 2>&1; then
+  caps=$(capsh --print 2>/dev/null | grep "Current:" || true)
+  echo "  $caps"
+  if echo "$caps" | grep -q "net_admin"; then
+    echo "  FAIL: main container has cap_net_admin (should be dropped)"
+  else
+    echo "  PASS: cap_net_admin absent from main container"
+  fi
+  if echo "$caps" | grep -q "net_raw"; then
+    echo "  FAIL: main container has cap_net_raw (should be dropped)"
+  else
+    echo "  PASS: cap_net_raw absent from main container"
+  fi
+else
+  echo "  capsh not available in this image; skipping capability check."
+fi
+
+echo ""
+echo "-------------------------------------------------------------------"
+echo "HARDENING 4: root tries to disable the iptables rules"
+echo "  (expects failure: NET_ADMIN dropped from main container)"
+echo "-------------------------------------------------------------------"
+if iptables -F 2>/dev/null; then
+  echo "RESULT: FAIL  root was able to flush iptables (NET_ADMIN present)"
+else
+  echo "RESULT: PASS  iptables -F denied (NET_ADMIN dropped or unprivileged)"
+fi
+
+echo ""
+echo "==================================================================="
+echo "Summary:"
+echo "  - Probes above show squid correctly ALLOWS/DENIES HTTP traffic."
+echo "  - Hardening checks show iptables prevents the common bypasses."
+echo "  - DNS-tunneling remains a documented follow-up (queries via the"
+echo "    cluster resolver are still permitted)."
+echo "==================================================================="
 '
 
 echo ""
