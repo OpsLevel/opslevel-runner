@@ -14,4 +14,5 @@ exec watchexec --watch "$SCRIPT_DIR/../src" --exts go,mod,sum --restart \
     --runner-pod-namespace=default \
     --job-pod-helper-image=localhost/opslevel-runner:dev \
     --job-pod-requests-cpu="${OPSLEVEL_JOB_POD_REQUESTS_CPU:-50}" \
-    --job-pod-requests-memory="${OPSLEVEL_JOB_POD_REQUESTS_MEMORY:-32}"
+    --job-pod-requests-memory="${OPSLEVEL_JOB_POD_REQUESTS_MEMORY:-32}" \
+    --job-pod-requests-ephemeral-storage="${OPSLEVEL_JOB_POD_REQUESTS_EPHEMERAL_STORAGE:-32}"

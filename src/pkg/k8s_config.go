@@ -40,12 +40,14 @@ func ReadPodConfig(path string) (*K8SPodConfig, error) {
 			WorkingDir: viper.GetString("job-pod-workdir"),
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
-					corev1.ResourceCPU:    *resource.NewMilliQuantity(viper.GetInt64("job-pod-requests-cpu"), resource.DecimalSI),
-					corev1.ResourceMemory: *resource.NewQuantity(viper.GetInt64("job-pod-requests-memory")*1024*1024, resource.BinarySI),
+					corev1.ResourceCPU:              *resource.NewMilliQuantity(viper.GetInt64("job-pod-requests-cpu"), resource.DecimalSI),
+					corev1.ResourceMemory:           *resource.NewQuantity(viper.GetInt64("job-pod-requests-memory")*1024*1024, resource.BinarySI),
+					corev1.ResourceEphemeralStorage: *resource.NewQuantity(viper.GetInt64("job-pod-requests-ephemeral-storage")*1024*1024, resource.BinarySI),
 				},
 				Limits: corev1.ResourceList{
-					corev1.ResourceCPU:    *resource.NewMilliQuantity(viper.GetInt64("job-pod-limits-cpu"), resource.DecimalSI),
-					corev1.ResourceMemory: *resource.NewQuantity(viper.GetInt64("job-pod-limits-memory")*1024*1024, resource.BinarySI),
+					corev1.ResourceCPU:              *resource.NewMilliQuantity(viper.GetInt64("job-pod-limits-cpu"), resource.DecimalSI),
+					corev1.ResourceMemory:           *resource.NewQuantity(viper.GetInt64("job-pod-limits-memory")*1024*1024, resource.BinarySI),
+					corev1.ResourceEphemeralStorage: *resource.NewQuantity(viper.GetInt64("job-pod-limits-ephemeral-storage")*1024*1024, resource.BinarySI),
 				},
 			},
 			TerminationGracePeriodSeconds: 5,
