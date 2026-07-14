@@ -16,6 +16,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
@@ -23,6 +24,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/utils/ptr"
 
 	"github.com/opslevel/opslevel-go/v2026"
 	"github.com/rs/zerolog"
@@ -33,6 +35,9 @@ const (
 	ContainerNameHelper = "helper"
 	ContainerNameInit   = "init"
 	ContainerNameJob    = "job"
+
+	SquidProxyImage    = "ubuntu/squid:latest@sha256:6a097f68bae708cedbabd6188d68c7e2e7a38cedd05a176e1cc0ba29e3bbe029"
+	SquidConfigMapName = "squid-config"
 )
 
 var (
@@ -93,7 +98,7 @@ func LoadK8SClient() {
 
 func NewJobRunner(runnerId string, path string) *JobRunner {
 	if !k8sValidated {
-		// It's ok if this function panics because we wouldn't beable to run jobs anyway
+		// It's ok if this function panics because we wouldn't be able to run jobs anyway
 		LoadK8SClient()
 	}
 	// kubernetes.Clientset is thread-safe and designed to be shared across goroutines
@@ -128,12 +133,20 @@ func (s *JobRunner) getPodEnv(configs []opslevel.RunnerJobVariable, scope opslev
 	return output
 }
 
+func getRunnerJobVariable(vars []opslevel.RunnerJobVariable, key string) string {
+	for _, v := range vars {
+		if v.Key == key {
+			return v.Value
+		}
+	}
+	return ""
+}
+
 func (s *JobRunner) getConfigMapObject(identifier string, job opslevel.RunnerJob) *corev1.ConfigMap {
 	data := map[string]string{}
 	for _, file := range job.Files {
 		data[file.Name] = file.Contents
 	}
-	immutable := true
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      identifier,
@@ -147,13 +160,12 @@ func (s *JobRunner) getConfigMapObject(identifier string, job opslevel.RunnerJob
 			//	},
 			//},
 		},
-		Immutable: &immutable,
+		Immutable: ptr.To(true),
 		Data:      data,
 	}
 }
 
 func (s *JobRunner) getPBDObject(identifier string, selector *metav1.LabelSelector) *policyv1.PodDisruptionBudget {
-	maxUnavailable := intstr.Parse("0")
 	return &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      identifier,
@@ -167,15 +179,22 @@ func (s *JobRunner) getPBDObject(identifier string, selector *metav1.LabelSelect
 			//},
 		},
 		Spec: policyv1.PodDisruptionBudgetSpec{
-			MaxUnavailable: &maxUnavailable,
+			MaxUnavailable: ptr.To(intstr.Parse("0")),
 			Selector:       selector,
 		},
 	}
 }
 
 func executable() *int32 {
-	value := int32(511)
-	return &value
+	return ptr.To(int32(511))
+}
+
+func getContainerNames(containers []corev1.Container) []string {
+	names := make([]string, 0, len(containers))
+	for _, container := range containers {
+		names = append(names, container.Name)
+	}
+	return names
 }
 
 func (s *JobRunner) getPodObject(identifier string, labels map[string]string, job opslevel.RunnerJob) *corev1.Pod {
@@ -185,41 +204,184 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 	podSecurityContext := s.podConfig.SecurityContext
 	if s.podConfig.AgentMode {
 		// Agent mode jobs need root user for Docker daemon
-		runAsUser := int64(0)
-		fsGroup := int64(0)
 		podSecurityContext = corev1.PodSecurityContext{
-			RunAsUser: &runAsUser,
-			FSGroup:   &fsGroup,
+			RunAsUser: ptr.To(int64(0)),
+			FSGroup:   ptr.To(int64(0)),
 		}
 	}
 
 	var containerSecurityContext *corev1.SecurityContext
 	if s.podConfig.AgentMode {
 		// Agent mode jobs need privileged mode for creating containers within container
-		privileged := true
 		containerSecurityContext = &corev1.SecurityContext{
-			Privileged: &privileged,
+			Privileged: ptr.To(true),
 		}
 	}
 
-	initContainers := []corev1.Container{
+	containers := []corev1.Container{
 		{
-			Name:            ContainerNameHelper,
-			Image:           s.podConfig.helperImage(),
-			ImagePullPolicy: s.podConfig.PullPolicy,
+			Name:            ContainerNameJob,
+			Image:           job.Image,
+			ImagePullPolicy: corev1.PullIfNotPresent,
 			Command: []string{
-				"cp",
-				"/opslevel-runner",
-				"/mount",
+				"/bin/sh",
+				"-c",
+				fmt.Sprintf("sleep %d", s.podConfig.Lifetime),
 			},
+			Resources:       s.podConfig.Resources,
+			Env:             s.getPodEnv(job.Variables, opslevel.RunnerJobVariableScopeMain),
+			SecurityContext: containerSecurityContext,
 			VolumeMounts: []corev1.VolumeMount{
 				{
+					Name:      "scripts",
+					ReadOnly:  true,
+					MountPath: "/opslevel",
+				},
+				{
 					Name:      "shared",
-					ReadOnly:  false,
+					ReadOnly:  true,
 					MountPath: "/mount",
+				},
+				{
+					Name:      "workspace",
+					ReadOnly:  false,
+					MountPath: s.podConfig.WorkingDir,
 				},
 			},
 		},
+	}
+
+	volumes := []corev1.Volume{
+		{
+			Name: "scripts",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: identifier,
+					},
+					DefaultMode: executable(),
+				},
+			},
+		},
+		{
+			Name: "shared",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+		{
+			Name: "workspace",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{},
+			},
+		},
+	}
+
+	// helperContainer copies the runner binary into the shared volume. It runs
+	// to completion before the main and sidecar containers start.
+	helperContainer := corev1.Container{
+		Name:            ContainerNameHelper,
+		Image:           s.podConfig.helperImage(),
+		ImagePullPolicy: s.podConfig.PullPolicy,
+		Command: []string{
+			"cp",
+			"/opslevel-runner",
+			"/mount",
+		},
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      "shared",
+				ReadOnly:  false,
+				MountPath: "/mount",
+			},
+		},
+	}
+	initContainers := []corev1.Container{helperContainer}
+
+	// squid sidecar runs before any job-init container so the networking layer
+	// (proxy + ACL list from the configmap) is up before init-clone traffic
+	// starts. It's a native sidecar (init container with RestartPolicy=Always)
+	// so kubelet gates the *next* init container on its TCP startupProbe.
+	// working with the queue name; can't use agentMode until agentMode stops
+	// implying privileged mode
+	if s.podConfig.Queue == "coding-agent" {
+		proxyAllowedDomains := getRunnerJobVariable(job.Variables, "PROXY_ALLOWED_DOMAINS")
+		squidUID := int64(13)
+		initContainers = append(initContainers, corev1.Container{
+			Name:            "squid",
+			Image:           SquidProxyImage,
+			ImagePullPolicy: corev1.PullIfNotPresent,
+			RestartPolicy:   ptr.To(corev1.ContainerRestartPolicyAlways),
+			Command:         []string{"/bin/sh", "-c"},
+			Args: []string{`set -eu
+: > /srv/squid/custom-allowed-domains.conf
+if [ -n "${PROXY_ALLOWED_DOMAINS:-}" ]; then
+  echo "$PROXY_ALLOWED_DOMAINS" | tr ',' '\n' > /srv/squid/custom-allowed-domains.conf
+fi
+printf 'include /etc/squid/conf.d/squid.conf\npid_filename /srv/squid/squid.pid\n' > /srv/squid/squid.conf
+exec squid -N -f /srv/squid/squid.conf
+`},
+			SecurityContext: &corev1.SecurityContext{
+				RunAsUser:  &squidUID,
+				RunAsGroup: &squidUID,
+			},
+			Ports: []corev1.ContainerPort{
+				{Name: "proxy", ContainerPort: 3128, Protocol: corev1.ProtocolTCP},
+			},
+			Env: []corev1.EnvVar{
+				{Name: "PROXY_ALLOWED_DOMAINS", Value: proxyAllowedDomains},
+			},
+			VolumeMounts: []corev1.VolumeMount{
+				{Name: "squid-config", ReadOnly: true, MountPath: "/etc/squid/conf.d"},
+				{Name: "squid-runtime", ReadOnly: false, MountPath: "/srv/squid"},
+			},
+			Resources: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("50m"),
+					corev1.ResourceMemory: resource.MustParse("128Mi"),
+				},
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("500m"),
+					corev1.ResourceMemory: resource.MustParse("512Mi"),
+				},
+			},
+			StartupProbe: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					TCPSocket: &corev1.TCPSocketAction{
+						Port: intstr.FromInt(3128),
+					},
+				},
+				InitialDelaySeconds: 0,
+				PeriodSeconds:       1,
+				TimeoutSeconds:      1,
+				FailureThreshold:    5,
+			},
+		})
+
+		volumes = append(volumes,
+			corev1.Volume{
+				Name: "squid-config",
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: SquidConfigMapName,
+						},
+					},
+				},
+			},
+			corev1.Volume{
+				Name:         "squid-runtime",
+				VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+			},
+		)
+
+		// set env vars to route job container traffic through the sidecar proxy.
+		proxyURL := "http://localhost:3128"
+		containers[0].Env = append(containers[0].Env,
+			corev1.EnvVar{Name: "http_proxy", Value: proxyURL},
+			corev1.EnvVar{Name: "https_proxy", Value: proxyURL},
+			corev1.EnvVar{Name: "no_proxy", Value: "localhost,127.0.0.1,::1"},
+		)
 	}
 
 	if len(job.InitCommands) > 0 {
@@ -240,63 +402,8 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 			ServiceAccountName:            s.podConfig.ServiceAccountName,
 			NodeSelector:                  s.podConfig.NodeSelector,
 			InitContainers:                initContainers,
-			Containers: []corev1.Container{
-				{
-					Name:            ContainerNameJob,
-					Image:           job.Image,
-					ImagePullPolicy: corev1.PullIfNotPresent,
-					Command: []string{
-						"/bin/sh",
-						"-c",
-						fmt.Sprintf("sleep %d", s.podConfig.Lifetime),
-					},
-					Resources:       s.podConfig.Resources,
-					Env:             s.getPodEnv(job.Variables, opslevel.RunnerJobVariableScopeMain),
-					SecurityContext: containerSecurityContext,
-					VolumeMounts: []corev1.VolumeMount{
-						{
-							Name:      "scripts",
-							ReadOnly:  true,
-							MountPath: "/opslevel",
-						},
-						{
-							Name:      "shared",
-							ReadOnly:  true,
-							MountPath: "/mount",
-						},
-						{
-							Name:      "workspace",
-							ReadOnly:  false,
-							MountPath: s.podConfig.WorkingDir,
-						},
-					},
-				},
-			},
-			Volumes: []corev1.Volume{
-				{
-					Name: "scripts",
-					VolumeSource: corev1.VolumeSource{
-						ConfigMap: &corev1.ConfigMapVolumeSource{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: identifier,
-							},
-							DefaultMode: executable(),
-						},
-					},
-				},
-				{
-					Name: "shared",
-					VolumeSource: corev1.VolumeSource{
-						EmptyDir: &corev1.EmptyDirVolumeSource{},
-					},
-				},
-				{
-					Name: "workspace",
-					VolumeSource: corev1.VolumeSource{
-						EmptyDir: &corev1.EmptyDirVolumeSource{},
-					},
-				},
-			},
+			Containers:                    containers,
+			Volumes:                       volumes,
 		},
 	}
 }
@@ -365,6 +472,20 @@ func (s *JobRunner) Run(ctx context.Context, job opslevel.RunnerJob, stdout, std
 		"app.kubernetes.io/instance":   identifier,
 		"app.kubernetes.io/managed-by": runnerIdentifier,
 	}
+
+	jobLogger := s.logger.With().
+		Str("job_id", string(job.Id)).
+		Str("namespace", s.podConfig.Namespace).
+		Logger()
+	ctx = jobLogger.WithContext(ctx)
+
+	jobLogger.Debug().
+		Str("image", job.Image).
+		Strs("commands", job.Commands).
+		Int("files", len(job.Files)).
+		Int("variables", len(job.Variables)).
+		Msg("job input received")
+
 	labelSelector, err := CreateLabelSelector(labels)
 	if err != nil {
 		return JobOutcome{
@@ -380,7 +501,7 @@ func (s *JobRunner) Run(ctx context.Context, job opslevel.RunnerJob, stdout, std
 			Outcome: opslevel.RunnerJobOutcomeEnumFailed,
 		}
 	}
-	defer s.DeleteConfigMap(context.Background(), cfgMap) // Use Background for cleanup to ensure it completes
+	defer s.DeleteConfigMap(jobLogger.WithContext(context.Background()), cfgMap) // Use Background for cleanup to ensure it completes
 
 	pdb, err := s.CreatePDB(ctx, s.getPBDObject(identifier, labelSelector))
 	if err != nil {
@@ -389,7 +510,7 @@ func (s *JobRunner) Run(ctx context.Context, job opslevel.RunnerJob, stdout, std
 			Outcome: opslevel.RunnerJobOutcomeEnumFailed,
 		}
 	}
-	defer s.DeletePDB(context.Background(), pdb) // Use Background for cleanup to ensure it completes
+	defer s.DeletePDB(jobLogger.WithContext(context.Background()), pdb) // Use Background for cleanup to ensure it completes
 
 	pod, err := s.CreatePod(ctx, s.getPodObject(identifier, labels, job))
 	if err != nil {
@@ -398,7 +519,7 @@ func (s *JobRunner) Run(ctx context.Context, job opslevel.RunnerJob, stdout, std
 			Outcome: opslevel.RunnerJobOutcomeEnumFailed,
 		}
 	}
-	defer s.DeletePod(context.Background(), pod) // Use Background for cleanup to ensure it completes
+	defer s.DeletePod(jobLogger.WithContext(context.Background()), pod) // Use Background for cleanup to ensure it completes
 
 	timeout := time.Second * time.Duration(viper.GetInt("job-pod-max-wait"))
 	waitErr := s.WaitForPod(ctx, pod, timeout)
@@ -449,6 +570,7 @@ func GetKubernetesConfig() (*rest.Config, error) {
 }
 
 func (s *JobRunner) ExecWithConfig(ctx context.Context, config JobConfig) error {
+	log := zerolog.Ctx(ctx)
 	req := s.clientset.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(config.PodName).
@@ -463,18 +585,41 @@ func (s *JobRunner) ExecWithConfig(ctx context.Context, config JobConfig) error 
 		Stderr:    config.Stderr != nil,
 		TTY:       false,
 	}, scheme.ParameterCodec)
-	s.logger.Debug().Msgf("Execing pod %s/%s ...", config.Namespace, config.PodName)
-	s.logger.Trace().Msgf("ExecWithOptions: execute(POST %s)", req.URL())
+	log.Debug().
+		Str("kind", "Pod").
+		Str("name", config.PodName).
+		Str("container", config.ContainerName).
+		Msg("execing pod")
+	log.Trace().Str("url", req.URL().String()).Msg("exec request")
 	exec, err := remotecommand.NewSPDYExecutor(s.config, "POST", req.URL())
 	if err != nil {
+		log.Error().Err(err).
+			Str("kind", "Pod").
+			Str("name", config.PodName).
+			Msg("pod exec failed")
 		return err
 	}
-	return exec.StreamWithContext(ctx, remotecommand.StreamOptions{
+	start := time.Now()
+	err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
 		Stdin:  config.Stdin,
 		Stdout: config.Stdout,
 		Stderr: config.Stderr,
 		Tty:    false,
 	})
+	if err != nil {
+		log.Error().Err(err).
+			Str("kind", "Pod").
+			Str("name", config.PodName).
+			Int64("duration_ms", time.Since(start).Milliseconds()).
+			Msg("pod exec failed")
+		return err
+	}
+	log.Debug().
+		Str("kind", "Pod").
+		Str("name", config.PodName).
+		Int64("duration_ms", time.Since(start).Milliseconds()).
+		Msg("pod exec complete")
+	return nil
 }
 
 func (s *JobRunner) Exec(ctx context.Context, stdout, stderr *SafeBuffer, pod *corev1.Pod, containerName string, cmd ...string) error {
@@ -490,18 +635,105 @@ func (s *JobRunner) Exec(ctx context.Context, stdout, stderr *SafeBuffer, pod *c
 }
 
 func (s *JobRunner) CreateConfigMap(ctx context.Context, config *corev1.ConfigMap) (*corev1.ConfigMap, error) {
-	s.logger.Trace().Msgf("Creating configmap %s/%s ...", config.Namespace, config.Name)
-	return s.clientset.CoreV1().ConfigMaps(config.Namespace).Create(ctx, config, metav1.CreateOptions{})
+	log := zerolog.Ctx(ctx)
+	keys := make([]string, 0, len(config.Data))
+	for k := range config.Data {
+		keys = append(keys, k)
+	}
+	log.Debug().
+		Str("kind", "ConfigMap").
+		Str("name", config.Name).
+		Bool("immutable", config.Immutable != nil && *config.Immutable).
+		Strs("data_keys", keys).
+		Msg("creating resource")
+
+	out, err := s.clientset.CoreV1().ConfigMaps(config.Namespace).Create(ctx, config, metav1.CreateOptions{})
+	if err != nil {
+		log.Error().Err(err).
+			Str("kind", "ConfigMap").
+			Str("name", config.Name).
+			Msg("create resource failed")
+		return out, err
+	}
+	log.Debug().
+		Str("kind", "ConfigMap").
+		Str("name", config.Name).
+		Msg("created resource")
+	return out, nil
 }
 
 func (s *JobRunner) CreatePDB(ctx context.Context, config *policyv1.PodDisruptionBudget) (*policyv1.PodDisruptionBudget, error) {
-	s.logger.Trace().Msgf("Creating pod disruption budget %s/%s ...", config.Namespace, config.Name)
-	return s.clientset.PolicyV1().PodDisruptionBudgets(config.Namespace).Create(ctx, config, metav1.CreateOptions{})
+	log := zerolog.Ctx(ctx)
+	maxUnavailable := ""
+	if config.Spec.MaxUnavailable != nil {
+		maxUnavailable = config.Spec.MaxUnavailable.String()
+	}
+	selector := ""
+	if config.Spec.Selector != nil {
+		parts := make([]string, 0, len(config.Spec.Selector.MatchLabels))
+		for k, v := range config.Spec.Selector.MatchLabels {
+			parts = append(parts, fmt.Sprintf("%s=%s", k, v))
+		}
+		selector = strings.Join(parts, ",")
+	}
+	log.Debug().
+		Str("kind", "PodDisruptionBudget").
+		Str("name", config.Name).
+		Str("max_unavailable", maxUnavailable).
+		Str("selector", selector).
+		Msg("creating resource")
+
+	out, err := s.clientset.PolicyV1().PodDisruptionBudgets(config.Namespace).Create(ctx, config, metav1.CreateOptions{})
+	if err != nil {
+		log.Error().Err(err).
+			Str("kind", "PodDisruptionBudget").
+			Str("name", config.Name).
+			Msg("create resource failed")
+		return out, err
+	}
+	log.Debug().
+		Str("kind", "PodDisruptionBudget").
+		Str("name", config.Name).
+		Msg("created resource")
+	return out, nil
 }
 
 func (s *JobRunner) CreatePod(ctx context.Context, config *corev1.Pod) (*corev1.Pod, error) {
-	s.logger.Trace().Msgf("Creating pod %s/%s ...", config.Namespace, config.Name)
-	return s.clientset.CoreV1().Pods(config.Namespace).Create(ctx, config, metav1.CreateOptions{})
+	log := zerolog.Ctx(ctx)
+
+	// main job container is index 0 by design
+	c := config.Spec.Containers[0]
+
+	log.Debug().
+		Str("kind", "Pod").
+		Str("name", config.Name).
+		Str("image", c.Image).
+		Int("containers", len(config.Spec.Containers)).
+		Int("init_containers", len(config.Spec.InitContainers)).
+		Strs("init_container_names", getContainerNames(config.Spec.InitContainers)).
+		Str("cpu_request", c.Resources.Requests.Cpu().String()).
+		Str("mem_request", c.Resources.Requests.Memory().String()).
+		Str("cpu_limit", c.Resources.Limits.Cpu().String()).
+		Str("mem_limit", c.Resources.Limits.Memory().String()).
+		Bool("privileged", c.SecurityContext != nil && c.SecurityContext.Privileged != nil && *c.SecurityContext.Privileged).
+		Int("env_count", len(c.Env)).
+		Int("volume_count", len(config.Spec.Volumes)).
+		Str("restart_policy", string(config.Spec.RestartPolicy)).
+		Msg("creating resource")
+
+	out, err := s.clientset.CoreV1().Pods(config.Namespace).Create(ctx, config, metav1.CreateOptions{})
+	if err != nil {
+		log.Error().Err(err).
+			Str("kind", "Pod").
+			Str("name", config.Name).
+			Msg("create resource failed")
+		return out, err
+	}
+	log.Debug().
+		Str("kind", "Pod").
+		Str("name", config.Name).
+		Msg("created resource")
+	return out, nil
 }
 
 func (s *JobRunner) isPodInDesiredState(podConfig *corev1.Pod) wait.ConditionWithContextFunc {
@@ -521,41 +753,97 @@ func (s *JobRunner) isPodInDesiredState(podConfig *corev1.Pod) wait.ConditionWit
 }
 
 func (s *JobRunner) WaitForPod(ctx context.Context, podConfig *corev1.Pod, timeout time.Duration) error {
-	s.logger.Debug().Msgf("Waiting for pod %s/%s to be ready in %s ...", podConfig.Namespace, podConfig.Name, timeout)
+	log := zerolog.Ctx(ctx)
+	log.Debug().
+		Str("kind", "Pod").
+		Str("name", podConfig.Name).
+		Int64("timeout_seconds", int64(timeout.Seconds())).
+		Msg("waiting for pod")
 	waitCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	return wait.PollUntilContextTimeout(waitCtx, time.Second, timeout, false, s.isPodInDesiredState(podConfig))
+	start := time.Now()
+	err := wait.PollUntilContextTimeout(waitCtx, time.Second, timeout, false, s.isPodInDesiredState(podConfig))
+	if err != nil {
+		log.Error().Err(err).
+			Str("kind", "Pod").
+			Str("name", podConfig.Name).
+			Int64("duration_ms", time.Since(start).Milliseconds()).
+			Msg("pod not ready")
+		return err
+	}
+	log.Debug().
+		Str("kind", "Pod").
+		Str("name", podConfig.Name).
+		Int64("duration_ms", time.Since(start).Milliseconds()).
+		Msg("pod ready")
+	return nil
 }
 
 func (s *JobRunner) DeleteConfigMap(ctx context.Context, config *corev1.ConfigMap) {
 	if config == nil {
 		return
 	}
-	s.logger.Trace().Msgf("Deleting configmap %s/%s ...", config.Namespace, config.Name)
+	log := zerolog.Ctx(ctx)
+	log.Debug().
+		Str("kind", "ConfigMap").
+		Str("name", config.Name).
+		Msg("deleting resource")
 	err := s.clientset.CoreV1().ConfigMaps(config.Namespace).Delete(ctx, config.Name, metav1.DeleteOptions{})
 	if err != nil {
-		s.logger.Error().Err(err).Msgf("received error on ConfigMap deletion")
+		log.Error().Err(err).
+			Str("kind", "ConfigMap").
+			Str("name", config.Name).
+			Msg("delete resource failed")
+		return
 	}
+	log.Debug().
+		Str("kind", "ConfigMap").
+		Str("name", config.Name).
+		Msg("deleted resource")
 }
 
 func (s *JobRunner) DeletePDB(ctx context.Context, config *policyv1.PodDisruptionBudget) {
 	if config == nil {
 		return
 	}
-	s.logger.Trace().Msgf("Deleting pod disruption budget %s/%s ...", config.Namespace, config.Name)
+	log := zerolog.Ctx(ctx)
+	log.Debug().
+		Str("kind", "PodDisruptionBudget").
+		Str("name", config.Name).
+		Msg("deleting resource")
 	err := s.clientset.PolicyV1().PodDisruptionBudgets(config.Namespace).Delete(ctx, config.Name, metav1.DeleteOptions{})
 	if err != nil {
-		s.logger.Error().Err(err).Msgf("received error on PDB deletion")
+		log.Error().Err(err).
+			Str("kind", "PodDisruptionBudget").
+			Str("name", config.Name).
+			Msg("delete resource failed")
+		return
 	}
+	log.Debug().
+		Str("kind", "PodDisruptionBudget").
+		Str("name", config.Name).
+		Msg("deleted resource")
 }
 
 func (s *JobRunner) DeletePod(ctx context.Context, config *corev1.Pod) {
 	if config == nil {
 		return
 	}
-	s.logger.Trace().Msgf("Deleting pod %s/%s ...", config.Namespace, config.Name)
+	log := zerolog.Ctx(ctx)
+	log.Debug().
+		Str("kind", "Pod").
+		Str("name", config.Name).
+		Msg("deleting resource")
 	err := s.clientset.CoreV1().Pods(config.Namespace).Delete(ctx, config.Name, metav1.DeleteOptions{})
 	if err != nil {
-		s.logger.Error().Err(err).Msgf("received error on Pod deletion")
+		log.Error().Err(err).
+			Str("kind", "Pod").
+			Str("name", config.Name).
+			Msg("delete resource failed")
+		return
 	}
+	log.Debug().
+		Str("kind", "Pod").
+		Str("name", config.Name).
+		Msg("deleted resource")
 }

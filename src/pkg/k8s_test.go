@@ -288,6 +288,128 @@ func TestGetPodObject_InitImageOverride(t *testing.T) {
 	autopilot.Equals(t, "alpine:latest", pod.Spec.Containers[0].Image)
 }
 
+// TestGetPodObject_CodingAgentQueue_noInitCommand verifies squid sidecar
+// wiring on the coding-agent queue when the job has no InitCommands: pod
+// gets helper + squid only (no job-init), squid runs as a native sidecar
+// (RestartPolicy=Always) on port 3128, PROXY_ALLOWED_DOMAINS is threaded
+// into squid's env, the main container has proxy env appended after user
+// vars, and squid's config/runtime volumes are mounted.
+func TestGetPodObject_CodingAgentQueue_noInitCommand(t *testing.T) {
+	// Arrange
+	runner := &JobRunner{
+		logger: zerolog.Nop(),
+		podConfig: &K8SPodConfig{
+			Namespace:                     "test",
+			Queue:                         "coding-agent",
+			WorkingDir:                    "/workdir",
+			Shell:                         "/bin/sh",
+			SecurityContext:               corev1.PodSecurityContext{},
+			TerminationGracePeriodSeconds: 30,
+		},
+	}
+	job := opslevel.RunnerJob{
+		Image: "alpine:latest",
+		Variables: []opslevel.RunnerJobVariable{
+			{Key: "PROXY_ALLOWED_DOMAINS", Value: "github.com,gitlab.com"},
+			{Key: "AI_API_KEY", Value: "secret"},
+		},
+	}
+
+	// Act
+	pod := runner.getPodObject("test-pod", map[string]string{}, job)
+
+	// Assert: helper + squid, in that order; no job-init because
+	// job.InitCommands is empty.
+	autopilot.Equals(t, 2, len(pod.Spec.InitContainers))
+	autopilot.Equals(t, ContainerNameHelper, pod.Spec.InitContainers[0].Name)
+	autopilot.Equals(t, "squid", pod.Spec.InitContainers[1].Name)
+
+	squid := pod.Spec.InitContainers[1]
+	// Native sidecar: RestartPolicy=Always so kubelet gates the next init
+	// container on its startupProbe.
+	autopilot.Assert(t, squid.RestartPolicy != nil, "squid must have RestartPolicy set")
+	autopilot.Equals(t, corev1.ContainerRestartPolicyAlways, *squid.RestartPolicy)
+	autopilot.Equals(t, int32(3128), squid.Ports[0].ContainerPort)
+	// PROXY_ALLOWED_DOMAINS is threaded into the squid env so the entrypoint
+	// script can materialize custom-allowed-domains.conf.
+	autopilot.Equals(t, []string{"PROXY_ALLOWED_DOMAINS"}, envKeys(squid.Env))
+	autopilot.Equals(t, "github.com,gitlab.com", squid.Env[0].Value)
+
+	// Job container gets proxy env appended after the user variables.
+	mainEnv := envKeys(pod.Spec.Containers[0].Env)
+	autopilot.Equals(t, []string{"PROXY_ALLOWED_DOMAINS", "AI_API_KEY", "http_proxy", "https_proxy", "no_proxy"}, mainEnv)
+
+	// Squid volumes wired.
+	autopilot.Assert(t, hasVolume(pod, "squid-config"), "squid-config volume should be present")
+	autopilot.Assert(t, hasVolume(pod, "squid-runtime"), "squid-runtime volume should be present")
+}
+
+func TestGetPodObject_NonCodingAgentQueue(t *testing.T) {
+	// Arrange
+	runner := &JobRunner{
+		logger: zerolog.Nop(),
+		podConfig: &K8SPodConfig{
+			Namespace:                     "test",
+			Queue:                         "default",
+			WorkingDir:                    "/workdir",
+			Shell:                         "/bin/sh",
+			SecurityContext:               corev1.PodSecurityContext{},
+			TerminationGracePeriodSeconds: 30,
+		},
+	}
+	job := opslevel.RunnerJob{
+		Image: "alpine:latest",
+		Variables: []opslevel.RunnerJobVariable{
+			{Key: "PROXY_ALLOWED_DOMAINS", Value: "github.com"},
+		},
+	}
+
+	// Act
+	pod := runner.getPodObject("test-pod", map[string]string{}, job)
+
+	// Assert: helper only; no squid sidecar, no squid volumes, no proxy env.
+	autopilot.Equals(t, 1, len(pod.Spec.InitContainers))
+	autopilot.Equals(t, ContainerNameHelper, pod.Spec.InitContainers[0].Name)
+	autopilot.Assert(t, !hasVolume(pod, "squid-config"), "squid-config volume should NOT be present")
+	autopilot.Assert(t, !hasVolume(pod, "squid-runtime"), "squid-runtime volume should NOT be present")
+	autopilot.Equals(t, []string{"PROXY_ALLOWED_DOMAINS"}, envKeys(pod.Spec.Containers[0].Env))
+}
+
+// TestGetPodObject_CodingAgentQueue_initCommand verifies init container
+// ordering on the coding-agent queue when the job provides InitCommands:
+// squid must be inserted between the helper init and the job-init
+// container so the proxy is up and its ACLs are authoritative before user
+// init commands (e.g. `git clone`) execute.
+func TestGetPodObject_CodingAgentQueue_initCommand(t *testing.T) {
+	// Arrange
+	runner := &JobRunner{
+		logger: zerolog.Nop(),
+		podConfig: &K8SPodConfig{
+			Namespace:                     "test",
+			Queue:                         "coding-agent",
+			WorkingDir:                    "/workdir",
+			Shell:                         "/bin/sh",
+			SecurityContext:               corev1.PodSecurityContext{},
+			TerminationGracePeriodSeconds: 30,
+		},
+	}
+	job := opslevel.RunnerJob{
+		Id:           "job-1",
+		Image:        "alpine:latest",
+		InitCommands: []string{"git clone https://github.com/example/repo ."},
+	}
+
+	// Act
+	pod := runner.getPodObject("test-pod", map[string]string{}, job)
+
+	// Assert: squid must precede the job-init container so the proxy is up
+	// and the ACL list is authoritative before the init clone runs.
+	autopilot.Equals(t, 3, len(pod.Spec.InitContainers))
+	autopilot.Equals(t, ContainerNameHelper, pod.Spec.InitContainers[0].Name)
+	autopilot.Equals(t, "squid", pod.Spec.InitContainers[1].Name)
+	autopilot.Equals(t, ContainerNameInit, pod.Spec.InitContainers[2].Name)
+}
+
 func envKeys(env []corev1.EnvVar) []string {
 	keys := make([]string, 0, len(env))
 	for _, e := range env {

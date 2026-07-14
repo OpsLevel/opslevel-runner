@@ -172,7 +172,7 @@ func runJob(ctx context.Context, helper worker.Helper, job opslevel.RunnerJob) p
 	go streamer.Run(ctx)
 
 	pkg.MetricJobsProcessing.Inc()
-	logger.Info().Msgf("Starting job '%s'", job.Id)
+	logger.Info().Str("job_id", string(job.Id)).Msg("job started")
 	runner := pkg.NewJobRunner("faktory", cfgFile)
 	outcome := runner.Run(ctx, job, streamer.Stdout, streamer.Stderr)
 	streamer.Flush(outcome)
@@ -186,7 +186,12 @@ func emitJobStartedMetrics() time.Time {
 
 func emitJobCompleteMetrics(jobStart time.Time, job opslevel.RunnerJob, outcome pkg.JobOutcome) {
 	jobDuration := time.Since(jobStart)
-	log.Info().Str("outcome", outcome.Message).Msgf("Finished job '%s' took '%s' and had outcome '%s'", job.Id, jobDuration, outcome.Outcome)
+	log.Info().
+		Str("job_id", string(job.Id)).
+		Str("outcome", string(outcome.Outcome)).
+		Int64("duration_ms", jobDuration.Milliseconds()).
+		Str("outcome_message", outcome.Message).
+		Msg("job finished")
 	pkg.MetricJobsDuration.Observe(jobDuration.Seconds())
 	pkg.MetricJobsFinished.WithLabelValues(string(outcome.Outcome)).Inc()
 	pkg.MetricJobsProcessing.Dec()
