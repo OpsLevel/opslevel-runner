@@ -386,16 +386,31 @@ func (s *JobRunner) Run(ctx context.Context, job opslevel.RunnerJob, stdout, std
 	// running pods can be filtered by account/job/mode without parsing the pod
 	// name. Added after building the selector so they stay out of the PDB
 	// selector, which the instance label already makes unique.
+	//
+	// Each label is stamped in both its prefixed long form (stable, ideal for
+	// DataDog podLabelsAsTags) and a short form for terse CLI filtering
+	// (e.g. `kubectl get pods -l accountID=XXX`).
+
+	// app.kubernetes.io/name is the well-known Kubernetes label for the name of
+	// the application; every job pod is an instance of "opslevel-job".
 	labels["app.kubernetes.io/name"] = "opslevel-job"
-	labels["opslevel.com/job-id"] = id
+	// mode is the runner backend the job came from: "api" or "faktory".
 	labels["opslevel.com/mode"] = viper.GetString("mode")
+	labels["mode"] = viper.GetString("mode")
+	// job-id is the OpsLevel job identifier (one value per job).
+	labels["opslevel.com/job-id"] = id
+	labels["jobID"] = id
 	// Variable keys arrive uppercased/sanitized by the OpsLevel API (see
 	// RunnerJobType#format_key_as_valid_env_var_name), so match the uppercase key.
 	if accountId := getRunnerJobVariable(job.Variables, "ACCOUNT_ID"); accountId != "" {
+		// account-id is the OpsLevel account the job belongs to.
 		labels["opslevel.com/account-id"] = accountId
+		labels["accountID"] = accountId
 	}
 	if jobType := getRunnerJobVariable(job.Variables, "JOB_TYPE"); jobType != "" {
+		// job-type is the job's kind / template slug (e.g. "repo_grep_v1").
 		labels["opslevel.com/job-type"] = jobType
+		labels["jobType"] = jobType
 	}
 	// TODO: manage pods based on image for re-use?
 	cfgMap, err := s.CreateConfigMap(ctx, s.getConfigMapObject(identifier, job))
