@@ -19,8 +19,7 @@ type OpsLevelAppendLogProcessor struct {
 	logLines          []string
 	logLinesBytesSize int
 	firstLine         bool
-	lastTime          time.Time
-	elapsed           time.Duration
+	lastSubmitTime    time.Time
 }
 
 func NewOpsLevelAppendLogProcessor(client *opslevel.Client, logger zerolog.Logger, runnerId opslevel.ID, jobId opslevel.ID, jobNumber string, maxBytes int, maxTime time.Duration) *OpsLevelAppendLogProcessor {
@@ -35,7 +34,7 @@ func NewOpsLevelAppendLogProcessor(client *opslevel.Client, logger zerolog.Logge
 		logLines:          []string{},
 		logLinesBytesSize: 0,
 		firstLine:         false,
-		lastTime:          time.Now(),
+		lastSubmitTime:    time.Now(),
 	}
 }
 
@@ -56,15 +55,16 @@ func (s *OpsLevelAppendLogProcessor) Process(line string) string {
 		s.submit()
 	}
 
-	s.elapsed += time.Since(s.lastTime)
-	if s.elapsed > s.maxTime {
+	return line
+}
+
+// Tick ships buffered logs once maxTime has elapsed since the last submit,
+// so a job that goes quiet still has its logs delivered on schedule.
+func (s *OpsLevelAppendLogProcessor) Tick() {
+	if len(s.logLines) > 0 && time.Since(s.lastSubmitTime) > s.maxTime {
 		s.logger.Trace().Msg("Shipping logs because of maxTime ...")
-		s.elapsed = 0
 		s.submit()
 	}
-	s.lastTime = time.Now()
-
-	return line
 }
 
 func (s *OpsLevelAppendLogProcessor) ProcessStdout(line string) string {
@@ -98,4 +98,5 @@ func (s *OpsLevelAppendLogProcessor) submit() {
 	}
 	s.logLinesBytesSize = 0
 	s.logLines = s.logLines[:0]
+	s.lastSubmitTime = time.Now()
 }
