@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/opslevel/opslevel-go/v2026"
@@ -312,6 +313,63 @@ func mountIsRW(mounts []corev1.VolumeMount, name string) bool {
 		}
 	}
 	return false
+}
+
+func TestJobCompletionMarker_EmbedsIdentifier(t *testing.T) {
+	// Arrange
+	identifier := "opslevel-job-abc-1700000000"
+	// Act
+	marker := jobCompletionMarker(identifier)
+	// Assert
+	autopilot.Assert(t, strings.Contains(marker, identifier), "marker must embed the unique pod identifier so job output cannot spoof it")
+}
+
+func TestMarkerWriter_DetectsMarkerInSingleWrite(t *testing.T) {
+	// Arrange
+	w := newMarkerWriter("MARKER")
+	// Act
+	_, err := w.Write([]byte("some logs\n[opslevel] MARKER done\nmore"))
+	// Assert
+	autopilot.Ok(t, err)
+	autopilot.Equals(t, true, w.found())
+}
+
+func TestMarkerWriter_DetectsMarkerSplitAcrossWrites(t *testing.T) {
+	// Arrange
+	w := newMarkerWriter("MARKER")
+	// Act: the marker straddles the boundary between two Write calls.
+	_, _ = w.Write([]byte("noise fooMAR"))
+	autopilot.Equals(t, false, w.found())
+	_, err := w.Write([]byte("KERbaz noise"))
+	// Assert
+	autopilot.Ok(t, err)
+	autopilot.Equals(t, true, w.found())
+}
+
+func TestMarkerWriter_AbsentMarker(t *testing.T) {
+	// Arrange
+	w := newMarkerWriter("MARKER")
+	// Act: a truncated stream that never emits the marker (severed exec).
+	_, _ = w.Write([]byte("processing check 83 of 100\n"))
+	_, err := w.Write([]byte("processing check 84 of 100\n"))
+	// Assert
+	autopilot.Ok(t, err)
+	autopilot.Equals(t, false, w.found())
+}
+
+func TestMarkerWriter_LargeStreamThenMarker(t *testing.T) {
+	// Arrange: ensure carry stays bounded and detection still works after lots of data.
+	w := newMarkerWriter("MARKER")
+	// Act
+	for i := 0; i < 1000; i++ {
+		_, _ = w.Write([]byte(strings.Repeat("x", 4096)))
+	}
+	autopilot.Equals(t, false, w.found())
+	autopilot.Assert(t, len(w.carry) < len(w.marker), "carry must never exceed len(marker)-1 bytes")
+	_, err := w.Write([]byte("tail MARKER tail"))
+	// Assert
+	autopilot.Ok(t, err)
+	autopilot.Equals(t, true, w.found())
 }
 
 // Suppress unused import warning for policyv1

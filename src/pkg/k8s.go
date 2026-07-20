@@ -1,12 +1,14 @@
 package pkg
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"path"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -53,6 +55,9 @@ type JobConfig struct {
 	Stdin         io.Reader
 	Stdout        *SafeBuffer
 	Stderr        *SafeBuffer
+	// StdoutTee, when set, receives a copy of everything written to Stdout. It is
+	// used to watch for the job-completion marker without disturbing the log stream.
+	StdoutTee io.Writer
 }
 
 type JobRunner struct {
@@ -411,12 +416,35 @@ func (s *JobRunner) Run(ctx context.Context, job opslevel.RunnerJob, stdout, std
 	}
 
 	workingDirectory := path.Join(s.podConfig.WorkingDir, id)
-	commands := append([]string{fmt.Sprintf("mkdir -p %s", workingDirectory), fmt.Sprintf("cd %s", workingDirectory), "set -xv"}, job.Commands...)
-	runErr := s.Exec(ctx, stdout, stderr, pod, pod.Spec.Containers[0].Name, s.podConfig.Shell, "-e", "-c", strings.Join(commands, ";\n"))
+	// The marker is emitted from an EXIT trap so its presence in stdout proves the
+	// shell reached its own exit - covering normal completion and explicit `exit 0`
+	// (which some templates use), but not a pod that is killed/evicted mid-command
+	// (SIGKILL/torn-down streams don't run traps). On a `set -e` failure the trap
+	// still fires, but runErr is non-nil then so we report Failed before checking the
+	// marker. The marker embeds the unique pod identifier so job output can't spoof it.
+	marker := jobCompletionMarker(identifier)
+	commands := append([]string{
+		fmt.Sprintf("trap \"echo '%s'\" EXIT", marker),
+		fmt.Sprintf("mkdir -p %s", workingDirectory),
+		fmt.Sprintf("cd %s", workingDirectory),
+		"set -xv",
+	}, job.Commands...)
+	completed, runErr := s.Exec(ctx, stdout, stderr, marker, pod, pod.Spec.Containers[0].Name, s.podConfig.Shell, "-e", "-c", strings.Join(commands, ";\n"))
 	if runErr != nil {
 		return JobOutcome{
 			Message: fmt.Sprintf("pod execution failed REASON: %s %s", strings.TrimSuffix(stderr.String(), "\n"), runErr),
 			Outcome: opslevel.RunnerJobOutcomeEnumFailed,
+		}
+	}
+
+	// A nil runErr with no completion marker means the exec stream closed without the
+	// API server delivering an exit status - i.e. the pod was terminated (evicted or
+	// exceeded its lifetime) mid-command. Treat this as a timeout, not a success, so
+	// the (partial) outcome is not silently reported as complete and the job retries.
+	if !completed {
+		return JobOutcome{
+			Message: "job exec stream ended before the command sequence completed; the pod was likely terminated (evicted or exceeded its lifetime) before finishing",
+			Outcome: opslevel.RunnerJobOutcomeEnumExecutionTimeout,
 		}
 	}
 
@@ -469,16 +497,26 @@ func (s *JobRunner) ExecWithConfig(ctx context.Context, config JobConfig) error 
 	if err != nil {
 		return err
 	}
+	var stdout io.Writer = config.Stdout
+	if config.StdoutTee != nil {
+		stdout = io.MultiWriter(config.Stdout, config.StdoutTee)
+	}
 	return exec.StreamWithContext(ctx, remotecommand.StreamOptions{
 		Stdin:  config.Stdin,
-		Stdout: config.Stdout,
+		Stdout: stdout,
 		Stderr: config.Stderr,
 		Tty:    false,
 	})
 }
 
-func (s *JobRunner) Exec(ctx context.Context, stdout, stderr *SafeBuffer, pod *corev1.Pod, containerName string, cmd ...string) error {
-	return s.ExecWithConfig(ctx, JobConfig{
+// Exec runs cmd in the pod and reports whether the command sequence ran to
+// completion. Completion is proven by observing marker in stdout: it is emitted from
+// the shell's EXIT trap, so its absence on a clean (nil error) return means the exec
+// stream was severed before the shell exited. When marker is empty no detection is
+// performed and completed is reported true.
+func (s *JobRunner) Exec(ctx context.Context, stdout, stderr *SafeBuffer, marker string, pod *corev1.Pod, containerName string, cmd ...string) (completed bool, err error) {
+	var detector *markerWriter
+	config := JobConfig{
 		Command:       cmd,
 		Namespace:     pod.Namespace,
 		PodName:       pod.Name,
@@ -486,7 +524,67 @@ func (s *JobRunner) Exec(ctx context.Context, stdout, stderr *SafeBuffer, pod *c
 		Stdin:         nil,
 		Stdout:        stdout,
 		Stderr:        stderr,
-	})
+	}
+	if marker != "" {
+		detector = newMarkerWriter(marker)
+		config.StdoutTee = detector
+	}
+	err = s.ExecWithConfig(ctx, config)
+	if detector == nil {
+		return true, err
+	}
+	return detector.found(), err
+}
+
+// jobCompletionMarker returns the sentinel emitted from a job exec's EXIT trap. It
+// embeds the unique pod identifier so a job's own output cannot spoof it.
+func jobCompletionMarker(identifier string) string {
+	return fmt.Sprintf("[opslevel] job exec completed marker=%s", identifier)
+}
+
+// markerWriter is an io.Writer that watches the byte stream for a marker string,
+// tolerating the marker being split across Write calls. It retains at most
+// len(marker)-1 bytes between writes, so it is safe for arbitrarily large streams.
+type markerWriter struct {
+	marker []byte
+	carry  []byte
+	seen   atomic.Bool
+}
+
+func newMarkerWriter(marker string) *markerWriter {
+	return &markerWriter{marker: []byte(marker)}
+}
+
+func (w *markerWriter) Write(p []byte) (int, error) {
+	if !w.seen.Load() {
+		overlap := len(w.marker) - 1
+		// Check the seam spanning the previous chunk's tail and this chunk's head,
+		// then the chunk itself, avoiding a full-stream copy.
+		if len(w.carry) > 0 {
+			seam := append(append([]byte{}, w.carry...), p[:min(len(p), overlap)]...)
+			if bytes.Contains(seam, w.marker) {
+				w.seen.Store(true)
+			}
+		}
+		if !w.seen.Load() && bytes.Contains(p, w.marker) {
+			w.seen.Store(true)
+		}
+		if overlap > 0 {
+			tail := p
+			if len(tail) > overlap {
+				tail = tail[len(tail)-overlap:]
+			}
+			w.carry = append(w.carry, tail...)
+			if len(w.carry) > overlap {
+				w.carry = w.carry[len(w.carry)-overlap:]
+			}
+		}
+	}
+	return len(p), nil
+}
+
+func (w *markerWriter) found() bool {
+	return w.seen.Load()
 }
 
 func (s *JobRunner) CreateConfigMap(ctx context.Context, config *corev1.ConfigMap) (*corev1.ConfigMap, error) {
