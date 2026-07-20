@@ -1,0 +1,3 @@
+kind: Bugfix
+body: Report a job as execution_timeout instead of success when the pod exec stream is severed (pod evicted or exceeded its lifetime) before the command sequence completes. Previously such jobs were silently reported as successful with a missing outcome, so repo-check batches that timed out on large repos never retried.
+time: 2026-07-20T11:35:39.846412-04:00
