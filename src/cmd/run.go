@@ -13,6 +13,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/opslevel/opslevel-go/v2026"
 	"github.com/opslevel/opslevel-runner/pkg"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -87,11 +88,9 @@ func startWorkers(ctx context.Context, runnerId opslevel.ID) *sync.WaitGroup {
 	wg := sync.WaitGroup{}
 	concurrency := getConcurrency()
 	wg.Add(concurrency)
-	jobQueue := make(chan opslevel.RunnerJob)
 	for w := 1; w <= concurrency; w++ {
-		go jobWorker(ctx, &wg, w, runnerId, jobQueue)
+		go jobWorker(ctx, &wg, w, runnerId)
 	}
-	go jobPoller(ctx, runnerId, jobQueue)
 	return &wg
 }
 
@@ -103,19 +102,30 @@ func getConcurrency() int {
 	return concurrency
 }
 
-func jobWorker(ctx context.Context, wg *sync.WaitGroup, index int, runnerId opslevel.ID, jobQueue <-chan opslevel.RunnerJob) {
+type pendingJobClient interface {
+	RunnerGetPendingJob(runnerId opslevel.ID, lastUpdateToken opslevel.ID) (*opslevel.RunnerJob, opslevel.ID, error)
+}
+
+func jobWorker(ctx context.Context, wg *sync.WaitGroup, index int, runnerId opslevel.ID) {
 	logMaxBytes := viper.GetInt("job-pod-log-max-size")
 	logMaxDuration := time.Duration(viper.GetInt("job-pod-log-max-interval")) * time.Second
 	logPrefix := func() string { return fmt.Sprintf("%s [%d] ", time.Now().UTC().Format(time.RFC3339), index) }
 	logLevel := strings.ToLower(viper.GetString("log-level"))
+	pollWaitTime := time.Second * time.Duration(viper.GetInt("poll-interval"))
 	logger := log.With().Int("worker", index).Logger()
 	client := pkg.NewGraphClient()
 	tracer := pkg.GetTracer()
 	runner := pkg.NewJobRunner(string(runnerId), cfgFile)
+	token := opslevel.ID("")
 
 	logger.Info().Msgf("Starting job processor %d ...", index)
 	defer wg.Done()
-	for job := range jobQueue {
+	for {
+		job, nextToken, ok := waitForJob(ctx, logger, client, runnerId, token, pollWaitTime)
+		if !ok {
+			break
+		}
+		token = nextToken
 		jobId := job.Id
 		jobNumber := job.Number()
 
@@ -141,7 +151,7 @@ func jobWorker(ctx context.Context, wg *sync.WaitGroup, index int, runnerId opsl
 			trace.WithSpanKind(trace.SpanKindConsumer),
 			trace.WithAttributes(attribute.String("job", jobNumber)),
 		)
-		outcome := runner.Run(ctx, job, streamer.Stdout, streamer.Stderr)
+		outcome := runner.Run(ctx, *job, streamer.Stdout, streamer.Stderr)
 		_, spanFinish := tracer.Start(traceCtx,
 			"finish-job",
 			trace.WithSpanKind(trace.SpanKindConsumer),
@@ -179,39 +189,37 @@ func jobWorker(ctx context.Context, wg *sync.WaitGroup, index int, runnerId opsl
 	logger.Info().Msgf("Shutting down job processor %d ...", index)
 }
 
-func jobPoller(ctx context.Context, runnerId opslevel.ID, jobQueue chan<- opslevel.RunnerJob) {
-	logger := log.With().Int("worker", 0).Logger()
-	client := pkg.NewGraphClient()
-	token := opslevel.ID("")
-	pollWaitTime := time.Second * time.Duration(viper.GetInt("poll-interval"))
-	logger.Info().Msg("Starting polling for jobs")
+func waitForJob(
+	ctx context.Context,
+	logger zerolog.Logger,
+	client pendingJobClient,
+	runnerId opslevel.ID,
+	token opslevel.ID,
+	pollWaitTime time.Duration,
+) (*opslevel.RunnerJob, opslevel.ID, bool) {
 	for {
 		select {
 		case <-ctx.Done():
-			logger.Info().Msg("Stopped Polling for jobs ...")
-			close(jobQueue)
-			return
+			return nil, token, false
 		default:
-			logger.Trace().Msg("Polling for jobs ...")
-			continuePolling := true
-			for continuePolling {
-				logger.Debug().Msgf("Get pending jobs with lastUpdateToken '%v' ...", token)
-				job, nextToken, err := client.RunnerGetPendingJob(runnerId, token)
-				if err != nil {
-					logger.Error().Err(err).Msg("got error when getting pending job")
-					continuePolling = false
-				} else {
-					token = nextToken
-					if job.Id == "" {
-						continuePolling = false
-					} else {
-						logger.Debug().Msgf("Enqueuing job '%s'", job.Number())
-						jobQueue <- *job
-					}
-				}
+		}
+
+		logger.Debug().Msgf("Get pending job with lastUpdateToken '%v' ...", token)
+		job, nextToken, err := client.RunnerGetPendingJob(runnerId, token)
+		if err != nil {
+			logger.Error().Err(err).Msg("got error when getting pending job")
+		} else {
+			token = nextToken
+			if job != nil && job.Id != "" {
+				return job, token, true
 			}
-			logger.Trace().Msgf("Finished Polling for jobs sleeping for %s ...", pollWaitTime)
-			time.Sleep(pollWaitTime)
+		}
+
+		logger.Trace().Msgf("No pending job, sleeping for %s ...", pollWaitTime)
+		select {
+		case <-ctx.Done():
+			return nil, token, false
+		case <-time.After(pollWaitTime):
 		}
 	}
 }
