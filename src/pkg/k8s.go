@@ -179,7 +179,6 @@ func executable() *int32 {
 }
 
 func (s *JobRunner) getPodObject(identifier string, labels map[string]string, job opslevel.RunnerJob) *corev1.Pod {
-	// TODO: Allow configuration of Labels
 	// TODO: Allow configuration of Pod Command
 
 	podSecurityContext := s.podConfig.SecurityContext
@@ -193,13 +192,14 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 		}
 	}
 
-	var containerSecurityContext *corev1.SecurityContext
+	containerSecurityContext := s.podConfig.ContainerSecurityContext.DeepCopy()
 	if s.podConfig.AgentMode {
 		// Agent mode jobs need privileged mode for creating containers within container
 		privileged := true
-		containerSecurityContext = &corev1.SecurityContext{
-			Privileged: &privileged,
+		if containerSecurityContext == nil {
+			containerSecurityContext = &corev1.SecurityContext{}
 		}
+		containerSecurityContext.Privileged = &privileged
 	}
 
 	initContainers := []corev1.Container{
@@ -207,6 +207,8 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 			Name:            ContainerNameHelper,
 			Image:           s.podConfig.helperImage(),
 			ImagePullPolicy: s.podConfig.PullPolicy,
+			Resources:       s.podConfig.Resources,
+			SecurityContext: containerSecurityContext.DeepCopy(),
 			Command: []string{
 				"cp",
 				"/opslevel-runner",
@@ -223,14 +225,14 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 	}
 
 	if len(job.InitCommands) > 0 {
-		initContainers = append(initContainers, s.getInitContainer(job, containerSecurityContext))
+		initContainers = append(initContainers, s.getInitContainer(job, containerSecurityContext.DeepCopy()))
 	}
 
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        identifier,
 			Namespace:   s.podConfig.Namespace,
-			Labels:      labels,
+			Labels:      s.podConfig.podLabels(labels),
 			Annotations: s.podConfig.Annotations,
 		},
 		Spec: corev1.PodSpec{
@@ -239,12 +241,17 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 			SecurityContext:               &podSecurityContext,
 			ServiceAccountName:            s.podConfig.ServiceAccountName,
 			NodeSelector:                  s.podConfig.NodeSelector,
+			DNSPolicy:                     s.podConfig.DNSPolicy,
+			RuntimeClassName:              s.podConfig.runtimeClassName(),
+			Tolerations:                   s.podConfig.Tolerations,
+			ActiveDeadlineSeconds:         s.podConfig.activeDeadlineSeconds(),
+			AutomountServiceAccountToken:  s.podConfig.AutomountServiceAccountToken,
 			InitContainers:                initContainers,
 			Containers: []corev1.Container{
 				{
 					Name:            ContainerNameJob,
-					Image:           job.Image,
-					ImagePullPolicy: corev1.PullIfNotPresent,
+					Image:           s.podConfig.jobImage(job.Image),
+					ImagePullPolicy: s.podConfig.jobPullPolicy(),
 					Command: []string{
 						"/bin/sh",
 						"-c",
@@ -252,7 +259,7 @@ func (s *JobRunner) getPodObject(identifier string, labels map[string]string, jo
 					},
 					Resources:       s.podConfig.Resources,
 					Env:             s.getPodEnv(job.Variables, opslevel.RunnerJobVariableScopeMain),
-					SecurityContext: containerSecurityContext,
+					SecurityContext: containerSecurityContext.DeepCopy(),
 					VolumeMounts: []corev1.VolumeMount{
 						{
 							Name:      "scripts",
