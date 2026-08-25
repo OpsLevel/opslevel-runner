@@ -1,0 +1,3 @@
+kind: Feature
+body: Add coding-agent proxy sidecar support for jobs, injecting a Squid egress proxy container alongside the runner pod
+time: 2026-07-09T00:00:00.000000Z

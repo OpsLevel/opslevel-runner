@@ -1,11 +1,13 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"time"
 
 	faktory "github.com/contribsys/faktory/client"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -32,6 +34,7 @@ var enqueueCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		job, err := readFaktoryJobInput()
 		cobra.CheckErr(err)
+
 		client, err := faktory.Open()
 		cobra.CheckErr(err)
 
@@ -55,6 +58,12 @@ var enqueueCmd = &cobra.Command{
 		if len(job.Custom) > 0 {
 			for key, value := range job.Custom {
 				j.SetCustom(key, value)
+			}
+		}
+
+		if log.Debug().Enabled() {
+			if b, merr := json.Marshal(j); merr == nil {
+				log.Debug().RawJSON("payload", b).Msg("Submitting Faktory job")
 			}
 		}
 
