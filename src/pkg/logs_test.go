@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -24,6 +25,29 @@ func (c *captureProcessor) ProcessStderr(line string) string {
 }
 
 func (c *captureProcessor) Flush(_ JobOutcome) {}
+
+type tickCountProcessor struct {
+	captureProcessor
+	ticks atomic.Int32
+}
+
+func (c *tickCountProcessor) Tick() {
+	c.ticks.Add(1)
+}
+
+func TestLogStreamerCallsTickWhileIdle(t *testing.T) {
+	proc := &tickCountProcessor{}
+	s := NewLogStreamer(zerolog.Nop(), proc)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go s.Run(ctx)
+
+	// No lines are ever written; the streamer should still tick processors.
+	time.Sleep(200 * time.Millisecond)
+
+	autopilot.Assert(t, proc.ticks.Load() > 0, "expected Tick to be called while idle")
+}
 
 func TestLogStreamerPartialLineStdout(t *testing.T) {
 	cap := &captureProcessor{}
