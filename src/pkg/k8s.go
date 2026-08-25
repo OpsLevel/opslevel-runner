@@ -439,12 +439,12 @@ func GetKubernetesConfig() (*rest.Config, error) {
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	configOverrides := &clientcmd.ConfigOverrides{}
 	config, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides).ClientConfig()
-	config.QPS = float32(viper.GetInt("k8s-api-qps"))
-	config.Burst = viper.GetInt("k8s-api-burst")
-	config.Timeout = time.Second * time.Duration(viper.GetInt("job-pod-exec-max-wait"))
 	if err != nil {
 		return nil, err
 	}
+	config.QPS = float32(viper.GetInt("k8s-api-qps"))
+	config.Burst = viper.GetInt("k8s-api-burst")
+	config.Timeout = time.Second * time.Duration(viper.GetInt("job-pod-exec-max-wait"))
 	return config, nil
 }
 
