@@ -193,6 +193,50 @@ func TestGetPodEnv_FiltersByScope(t *testing.T) {
 	autopilot.Equals(t, []string{"BOTH", "MAIN_ONLY"}, mainKeys)
 }
 
+func TestGetRunnerJobVariable_ReturnsMatchingValue(t *testing.T) {
+	// Arrange
+	// The OpsLevel API uppercases/sanitizes variable keys before sending them,
+	// so the runner matches the uppercase key.
+	vars := []opslevel.RunnerJobVariable{
+		{Key: "FOO", Value: "bar"},
+		{Key: "ACCOUNT_ID", Value: "acct-123"},
+	}
+
+	// Act
+	value := getRunnerJobVariable(vars, "ACCOUNT_ID")
+
+	// Assert
+	autopilot.Equals(t, "acct-123", value)
+}
+
+func TestGetRunnerJobVariable_ReturnsEmptyWhenMissing(t *testing.T) {
+	// Arrange
+	vars := []opslevel.RunnerJobVariable{
+		{Key: "FOO", Value: "bar"},
+	}
+
+	// Act
+	value := getRunnerJobVariable(vars, "ACCOUNT_ID")
+
+	// Assert
+	autopilot.Equals(t, "", value)
+}
+
+func TestGetRunnerJobVariable_IsCaseSensitive(t *testing.T) {
+	// Arrange
+	// Guards the bug where the runner looked up "account_id" but the API sends
+	// "ACCOUNT_ID"; the lowercase key must NOT match.
+	vars := []opslevel.RunnerJobVariable{
+		{Key: "ACCOUNT_ID", Value: "acct-123"},
+	}
+
+	// Act
+	value := getRunnerJobVariable(vars, "account_id")
+
+	// Assert
+	autopilot.Equals(t, "", value)
+}
+
 func TestGetPodObject_NoInitCommands(t *testing.T) {
 	// Arrange
 	runner := &JobRunner{
