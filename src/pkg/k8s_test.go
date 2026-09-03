@@ -36,7 +36,8 @@ func TestGetPodObject_AgentModePrivileged(t *testing.T) {
 		},
 	}
 	job := opslevel.RunnerJob{
-		Image: "alpine:latest",
+		Image:        "alpine:latest",
+		InitCommands: []string{"prepare"},
 	}
 	labels := map[string]string{"app": "test"}
 
@@ -44,9 +45,19 @@ func TestGetPodObject_AgentModePrivileged(t *testing.T) {
 	pod := runner.getPodObject("test-pod", labels, job)
 
 	// Assert
-	autopilot.Assert(t, pod.Spec.Containers[0].SecurityContext != nil, "SecurityContext should be set for agent mode")
-	autopilot.Assert(t, pod.Spec.Containers[0].SecurityContext.Privileged != nil, "Privileged should be set for agent mode")
-	autopilot.Equals(t, true, *pod.Spec.Containers[0].SecurityContext.Privileged)
+	containers := append([]corev1.Container{}, pod.Spec.InitContainers...)
+	containers = append(containers, pod.Spec.Containers...)
+	for _, container := range containers {
+		t.Run(container.Name, func(t *testing.T) {
+			if container.SecurityContext == nil {
+				t.Fatal("SecurityContext should be set for agent mode")
+			}
+			if container.SecurityContext.Privileged == nil {
+				t.Fatal("Privileged should be set for agent mode")
+			}
+			autopilot.Equals(t, true, *container.SecurityContext.Privileged)
+		})
+	}
 	autopilot.Equals(t, int64(0), *pod.Spec.SecurityContext.RunAsUser)
 	autopilot.Equals(t, int64(0), *pod.Spec.SecurityContext.FSGroup)
 }
