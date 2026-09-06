@@ -1,3 +1,4 @@
 faktory: faktory
 runner: ../bin/opslevel-runner-runner
+coding-agent: ../bin/opslevel-runner-coding-agent
 image-builder: watchexec --watch cmd/enqueue.go --watch cmd/root.go --watch main.go --watch go.mod --watch go.sum --watch ../Dockerfile -- HELPER_IMAGE=localhost/opslevel-runner:dev ../bin/build-helper-image.sh opslevel-runner
