@@ -1,0 +1,3 @@
+kind: Feature
+body: Emit account/job metadata as Kubernetes pod labels (`opslevel.com/account-id`, `opslevel.com/job-id`, `opslevel.com/mode`, `opslevel.com/job-type`, plus a short-form `accountID`) so job pods can be filtered by account/job/mode without parsing the pod name
+time: 2026-07-17T00:00:00.000000Z
