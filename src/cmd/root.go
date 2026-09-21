@@ -54,6 +54,10 @@ func init() {
 	rootCmd.PersistentFlags().Int("job-pod-log-max-size", 1000000, "The max amount in bytes to buffer before pod logs are shipped to OpsLevel. Works in tandem with 'job-pod-log-max-interval'")
 	rootCmd.PersistentFlags().Bool("job-agent-mode", false, "Enable agent mode with privileged security context for Container-in-Container support. WARNING: This grants elevated privileges and should only be enabled for trusted workloads.")
 	rootCmd.PersistentFlags().String("job-pod-helper-image", "", "Override the helper init container image. Defaults to the published ECR image matching the runner version. Useful for local development with kind.")
+	rootCmd.PersistentFlags().String("job-pod-image", "", "Override the image the job container runs. Defaults to the image from the job definition.")
+	rootCmd.PersistentFlags().String("job-pod-runtime-class-name", "", "The RuntimeClass to run job pods under, ie 'kata-qemu' for VM isolation. Empty runs under the cluster default runtime with no VM boundary.")
+	rootCmd.PersistentFlags().Int64("job-pod-active-deadline", 0, "The hard deadline in seconds after which the job pod is terminated by kubernetes. 0 leaves it unset.")
+	rootCmd.PersistentFlags().String("job-pod-automount-service-account-token", "", "Whether to project a kubernetes API token into job pods (options [\"true\", \"false\"]). Empty leaves the namespace default in place.")
 	rootCmd.PersistentFlags().String("queue", "", "The queue this runner should process jobs from. Empty means the default queue.")
 
 	rootCmd.PersistentFlags().Int("k8s-api-qps", 50, "The maximum sustained queries per second to the Kubernetes API server.")
@@ -81,6 +85,10 @@ func init() {
 	viper.BindEnv("job-pod-log-max-size", "OPSLEVEL_JOB_POD_LOG_MAX_SIZE")
 	viper.BindEnv("job-agent-mode", "OPSLEVEL_JOB_AGENT_MODE")
 	viper.BindEnv("job-pod-helper-image", "OPSLEVEL_JOB_POD_HELPER_IMAGE")
+	viper.BindEnv("job-pod-image", "OPSLEVEL_JOB_POD_IMAGE")
+	viper.BindEnv("job-pod-runtime-class-name", "OPSLEVEL_JOB_POD_RUNTIME_CLASS_NAME")
+	viper.BindEnv("job-pod-active-deadline", "OPSLEVEL_JOB_POD_ACTIVE_DEADLINE")
+	viper.BindEnv("job-pod-automount-service-account-token", "OPSLEVEL_JOB_POD_AUTOMOUNT_SERVICE_ACCOUNT_TOKEN")
 	viper.BindEnv("queue", "OPSLEVEL_QUEUE")
 
 	viper.BindEnv("k8s-api-qps", "OPSLEVEL_K8S_API_QPS")
