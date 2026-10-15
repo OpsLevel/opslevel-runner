@@ -1,3 +1,0 @@
-kind: Security
-body: Bump Go toolchain to 1.26.9 and golang.org/x/net to v0.60.0 to fix GO-2026-6612 (HTTP/2 server connection-level flow control double refund)
-time: 2026-10-15T00:00:00.000000Z
