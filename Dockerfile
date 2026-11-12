@@ -1,7 +1,7 @@
 FROM golang:alpine@sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d AS build
 RUN apk --no-cache add ca-certificates
 
-FROM alpine:latest@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
+FROM alpine:latest@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
 # alpine:latest is only rebuilt on alpine point releases, so it can ship packages
 # with CVEs that are already patched in the apk repos - pull those fixes in here
 RUN apk --no-cache upgrade
