@@ -191,14 +191,18 @@ func executable() *int32 {
 func (s *JobRunner) getPodObject(identifier string, labels map[string]string, job opslevel.RunnerJob) *corev1.Pod {
 	// TODO: Allow configuration of Pod Command
 
-	podSecurityContext := s.podConfig.SecurityContext
+	podSecurityContext := *s.podConfig.SecurityContext.DeepCopy()
 	if s.podConfig.AgentMode {
-		// Agent mode jobs need root user for Docker daemon
-		runAsUser := int64(0)
-		fsGroup := int64(0)
-		podSecurityContext = corev1.PodSecurityContext{
-			RunAsUser: &runAsUser,
-			FSGroup:   &fsGroup,
+		// Agent mode jobs need root for the Docker daemon. Default RunAsUser and
+		// FSGroup to 0 only when the pod config leaves them unset, so configured
+		// values (e.g. fsGroup for volume ownership) are kept.
+		if podSecurityContext.RunAsUser == nil {
+			runAsUser := int64(0)
+			podSecurityContext.RunAsUser = &runAsUser
+		}
+		if podSecurityContext.FSGroup == nil {
+			fsGroup := int64(0)
+			podSecurityContext.FSGroup = &fsGroup
 		}
 	}
 
