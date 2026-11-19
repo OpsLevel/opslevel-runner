@@ -371,3 +371,78 @@ func mountIsRW(mounts []corev1.VolumeMount, name string) bool {
 
 // Suppress unused import warning for policyv1
 var _ = policyv1.PodDisruptionBudget{}
+
+func TestGetPodObject_AgentModeSecurityContextMerge(t *testing.T) {
+	int64Ptr := func(v int64) *int64 { return &v }
+	boolPtr := func(v bool) *bool { return &v }
+
+	cases := []struct {
+		name      string
+		agentMode bool
+		config    corev1.PodSecurityContext
+		expected  corev1.PodSecurityContext
+	}{
+		{
+			name:      "agent mode, no config defaults to root",
+			agentMode: true,
+			config:    corev1.PodSecurityContext{},
+			expected:  corev1.PodSecurityContext{RunAsUser: int64Ptr(0), FSGroup: int64Ptr(0)},
+		},
+		{
+			name:      "agent mode, fsGroup only keeps fsGroup",
+			agentMode: true,
+			config:    corev1.PodSecurityContext{FSGroup: int64Ptr(1000)},
+			expected:  corev1.PodSecurityContext{RunAsUser: int64Ptr(0), FSGroup: int64Ptr(1000)},
+		},
+		{
+			name:      "agent mode, every field set keeps config",
+			agentMode: true,
+			config: corev1.PodSecurityContext{
+				RunAsUser:          int64Ptr(1001),
+				RunAsGroup:         int64Ptr(1002),
+				FSGroup:            int64Ptr(1003),
+				SupplementalGroups: []int64{2000},
+				RunAsNonRoot:       boolPtr(true),
+			},
+			expected: corev1.PodSecurityContext{
+				RunAsUser:          int64Ptr(1001),
+				RunAsGroup:         int64Ptr(1002),
+				FSGroup:            int64Ptr(1003),
+				SupplementalGroups: []int64{2000},
+				RunAsNonRoot:       boolPtr(true),
+			},
+		},
+		{
+			name:      "non-agent mode, no config is unchanged",
+			agentMode: false,
+			config:    corev1.PodSecurityContext{},
+			expected:  corev1.PodSecurityContext{},
+		},
+		{
+			name:      "non-agent mode, config is unchanged",
+			agentMode: false,
+			config:    corev1.PodSecurityContext{FSGroup: int64Ptr(1000)},
+			expected:  corev1.PodSecurityContext{FSGroup: int64Ptr(1000)},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			runner := &JobRunner{
+				logger: zerolog.Nop(),
+				podConfig: &K8SPodConfig{
+					Namespace:                     "test",
+					SecurityContext:               tc.config,
+					TerminationGracePeriodSeconds: 30,
+					AgentMode:                     tc.agentMode,
+				},
+			}
+
+			pod := runner.getPodObject("test-pod", map[string]string{"app": "test"}, opslevel.RunnerJob{Image: "alpine:latest"})
+
+			autopilot.Equals(t, tc.expected, *pod.Spec.SecurityContext)
+			// The shared pod config must not be mutated by defaulting.
+			autopilot.Equals(t, tc.config, runner.podConfig.SecurityContext)
+		})
+	}
+}
